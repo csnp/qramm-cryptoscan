@@ -68,6 +68,7 @@ type Results struct {
 	ScanDuration   time.Duration        `json:"scanDuration"`
 	FilesScanned   int                  `json:"filesScanned"`
 	LinesScanned   int                  `json:"linesScanned"`
+	BytesScanned   int64                `json:"bytesScanned"`
 	LanguageStats  map[string]int       `json:"languageStats"`
 	Metadata       map[string]string    `json:"metadata,omitempty"`
 }
@@ -112,6 +113,7 @@ type Scanner struct {
 	stats    struct {
 		filesScanned  int
 		linesScanned  int
+		bytesScanned  int64
 		languageStats map[string]int
 	}
 }
@@ -130,6 +132,7 @@ func New(cfg Config) *Scanner {
 		stats: struct {
 			filesScanned  int
 			linesScanned  int
+			bytesScanned  int64
 			languageStats map[string]int
 		}{
 			languageStats: make(map[string]int),
@@ -160,7 +163,10 @@ func (s *Scanner) Scan() (*Results, error) {
 	if info.IsDir() {
 		err = s.scanDirectory(target)
 	} else {
-		err = s.scanFile(target)
+		// Check if single file should be scanned (apply same filters as directory scan)
+		if s.shouldScanFile(target) {
+			err = s.scanFile(target)
+		}
 	}
 
 	if err != nil {
@@ -177,6 +183,7 @@ func (s *Scanner) Scan() (*Results, error) {
 		Findings:      s.findings,
 		FilesScanned:  s.stats.filesScanned,
 		LinesScanned:  s.stats.linesScanned,
+		BytesScanned:  s.stats.bytesScanned,
 		LanguageStats: s.stats.languageStats,
 		Metadata:      make(map[string]string),
 	}
@@ -298,7 +305,7 @@ func (s *Scanner) shouldScanFile(path string) bool {
 	name := filepath.Base(path)
 	ext := filepath.Ext(path)
 
-	// Skip binary files
+	// Skip binary files by extension
 	binaryExts := map[string]bool{
 		".exe": true, ".dll": true, ".so": true, ".dylib": true,
 		".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".ico": true,
@@ -312,6 +319,11 @@ func (s *Scanner) shouldScanFile(path string) bool {
 		".pptx": true, ".ppt": true, ".odt": true, ".ods": true, ".odp": true,
 	}
 	if binaryExts[ext] {
+		return false
+	}
+
+	// Skip compiled binaries without extensions (ELF, Mach-O, PE)
+	if ext == "" && isBinaryFile(path) {
 		return false
 	}
 
@@ -354,11 +366,19 @@ func (s *Scanner) scanFile(path string) error {
 	}
 	defer file.Close()
 
+	// Get file size for stats
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil
+	}
+	fileSize := fileInfo.Size()
+
 	// Analyze file context
 	fileCtx := analyzer.Analyze(path)
 
 	s.mu.Lock()
 	s.stats.filesScanned++
+	s.stats.bytesScanned += fileSize
 	s.stats.languageStats[string(fileCtx.Language)]++
 	s.mu.Unlock()
 
@@ -716,4 +736,41 @@ func isGitURL(s string) bool {
 	return strings.HasPrefix(s, "http://") ||
 		strings.HasPrefix(s, "https://") ||
 		strings.HasPrefix(s, "git@")
+}
+
+// isBinaryFile checks if a file is a compiled binary by reading magic bytes
+func isBinaryFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	// Read first 4 bytes for magic number detection
+	magic := make([]byte, 4)
+	n, err := f.Read(magic)
+	if err != nil || n < 4 {
+		return false
+	}
+
+	// ELF binary (Linux): \x7fELF
+	if magic[0] == 0x7f && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F' {
+		return true
+	}
+
+	// Mach-O binary (macOS): various magic numbers
+	// 32-bit: 0xfeedface, 64-bit: 0xfeedfacf, universal: 0xcafebabe
+	if (magic[0] == 0xfe && magic[1] == 0xed && magic[2] == 0xfa && (magic[3] == 0xce || magic[3] == 0xcf)) ||
+		(magic[0] == 0xcf && magic[1] == 0xfa && magic[2] == 0xed && magic[3] == 0xfe) ||
+		(magic[0] == 0xce && magic[1] == 0xfa && magic[2] == 0xed && magic[3] == 0xfe) ||
+		(magic[0] == 0xca && magic[1] == 0xfe && magic[2] == 0xba && magic[3] == 0xbe) {
+		return true
+	}
+
+	// PE binary (Windows): MZ
+	if magic[0] == 'M' && magic[1] == 'Z' {
+		return true
+	}
+
+	return false
 }

@@ -86,10 +86,11 @@ func (r *TextReporter) Generate(results *scanner.Results) (string, error) {
 
 	// Scan metadata in a box
 	b.WriteString(r.color(colorCyan, "┌─ Scan Information ─────────────────────────────────────────────┐\n"))
-	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, " Target:   ") + fmt.Sprintf("%-52s", results.ScanTarget) + r.color(colorCyan, "│\n"))
+	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, " Target:   ") + fmt.Sprintf("%-52s", truncatePath(results.ScanTarget, 52)) + r.color(colorCyan, "│\n"))
 	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, " Time:     ") + fmt.Sprintf("%-52s", results.ScanTime.Format("2006-01-02 15:04:05")) + r.color(colorCyan, "│\n"))
-	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, " Duration: ") + fmt.Sprintf("%-52s", results.ScanDuration.String()) + r.color(colorCyan, "│\n"))
-	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, " Files:    ") + fmt.Sprintf("%-52s", fmt.Sprintf("%d files, %d lines scanned", results.FilesScanned, results.LinesScanned)) + r.color(colorCyan, "│\n"))
+	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, " Duration: ") + fmt.Sprintf("%-52s", results.ScanDuration.Round(1000000).String()) + r.color(colorCyan, "│\n"))
+	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, " Scanned:  ") + fmt.Sprintf("%-52s", fmt.Sprintf("%d files • %d lines • %s", results.FilesScanned, results.LinesScanned, formatBytes(results.BytesScanned))) + r.color(colorCyan, "│\n"))
+	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, " Speed:    ") + fmt.Sprintf("%-52s", formatScanSpeed(results)) + r.color(colorCyan, "│\n"))
 	b.WriteString(r.color(colorCyan, "└─────────────────────────────────────────────────────────────────┘\n"))
 	b.WriteString("\n")
 
@@ -385,4 +386,42 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// formatBytes converts bytes to human readable format
+func formatBytes(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.2f MB", float64(bytes)/float64(MB))
+	case bytes >= KB:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/float64(KB))
+	default:
+		return fmt.Sprintf("%d B", bytes)
+	}
+}
+
+// formatScanSpeed calculates and formats scan speed metrics
+func formatScanSpeed(results *scanner.Results) string {
+	if results.ScanDuration.Seconds() == 0 {
+		return "N/A"
+	}
+	secs := results.ScanDuration.Seconds()
+	filesPerSec := float64(results.FilesScanned) / secs
+	mbPerSec := float64(results.BytesScanned) / (1024 * 1024) / secs
+	return fmt.Sprintf("%.0f files/sec • %.1f MB/sec", filesPerSec, mbPerSec)
+}
+
+// truncatePath shortens a path to fit within maxLen
+func truncatePath(path string, maxLen int) string {
+	if len(path) <= maxLen {
+		return path
+	}
+	return "..." + path[len(path)-maxLen+3:]
 }
