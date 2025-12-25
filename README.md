@@ -1,121 +1,143 @@
-# CryptoScan
+<p align="center">
+  <img src="https://qramm.org/images/cryptoscan-logo.svg" alt="CryptoScan" width="400">
+</p>
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
+<h3 align="center">Discover. Assess. Migrate.</h3>
 
-**CryptoScan** is a powerful command-line tool for discovering cryptographic algorithms, key sizes, and quantum-vulnerable patterns in codebases. Part of the [QRAMM](https://qramm.org) (Quantum Readiness Assurance Maturity Model) toolkit by [CSNP](https://csnp.org).
+<p align="center">
+  <strong>The open-source crypto discovery tool for the post-quantum era</strong>
+</p>
 
-## CSNP Mission
+<p align="center">
+  <a href="https://github.com/csnp/qramm-cryptoscan/actions/workflows/ci.yml"><img src="https://github.com/csnp/qramm-cryptoscan/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/gh/csnp/qramm-cryptoscan"><img src="https://codecov.io/gh/csnp/qramm-cryptoscan/branch/main/graph/badge.svg" alt="Coverage"></a>
+  <a href="https://goreportcard.com/report/github.com/csnp/qramm-cryptoscan"><img src="https://goreportcard.com/badge/github.com/csnp/qramm-cryptoscan" alt="Go Report Card"></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white" alt="Go Version"></a>
+</p>
 
-*Advancing cybersecurity through education, research, and open-source tools that empower organizations worldwide.*
+<p align="center">
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-features">Features</a> •
+  <a href="#-why-cryptoscan">Why CryptoScan</a> •
+  <a href="#-output-formats">Output Formats</a> •
+  <a href="#-docs">Docs</a>
+</p>
 
-## Features
+---
 
-- **Quantum Risk Assessment**: Identifies cryptographic implementations vulnerable to quantum computing attacks
-- **Comprehensive Detection**: Scans for 50+ cryptographic patterns including:
-  - Asymmetric algorithms: RSA, ECDSA, DSA, DH, ECDH, Ed25519
-  - Symmetric algorithms: AES, DES, 3DES, RC4, Blowfish, ChaCha20
-  - Hash functions: MD5, SHA-1, SHA-2 family, SHA-3
-  - TLS/SSL configurations and cipher suites
-  - Crypto library imports (Python, Java, Go, Node.js, OpenSSL)
-  - Private keys and certificates (RSA, EC, DSA, SSH, PGP, PKCS#8)
-  - Cloud KMS references (AWS KMS, Azure Key Vault, GCP KMS, HashiCorp Vault)
-  - JWT secrets, HMAC keys, and hardcoded encryption keys
-  - Weak key derivation (PBKDF with low iterations)
-- **Dependency Scanning**: Detects crypto libraries in 20+ dependency manifest formats
-- **Context-Aware Analysis**: Adjusts confidence based on file type, language, and code context
-- **Multiple Output Formats**:
-  - Text (professional CLI with visual indicators)
-  - JSON (for programmatic processing)
-  - **CSV** (for spreadsheet analysis and reporting)
-  - SARIF (for security tool integration)
-  - CBOM (Cryptographic Bill of Materials - CycloneDX format)
-- **Flexible Scanning**: Include/exclude patterns, severity filtering, directory depth limits
-- **Actionable Remediation**: Each finding includes NIST PQC migration guidance
+## The Problem
 
-## Installation
+**Quantum computers will break RSA, ECDSA, and DH within the next decade.** The NSA, NIST, and major tech companies are already migrating. But you can't migrate what you can't find.
 
-### From Source
+CryptoScan solves this by scanning your entire codebase in seconds, identifying every cryptographic algorithm, key, and configuration that needs attention.
+
+## Quick Start
 
 ```bash
+# Install
+go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@latest
+
+# Scan your project
+cryptoscan scan .
+
+# That's it. You now know your quantum risk.
+```
+
+<details>
+<summary><strong>Other installation methods</strong></summary>
+
+```bash
+# From source
 git clone https://github.com/csnp/qramm-cryptoscan.git
 cd qramm-cryptoscan
 go build -o cryptoscan ./cmd/cryptoscan
 ```
 
-### Using Go Install
+</details>
 
-```bash
-go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@latest
-```
+## Features
 
-## Quick Start
+| Category | What We Find |
+|----------|--------------|
+| **Asymmetric Crypto** | RSA, ECDSA, DSA, DH, ECDH, Ed25519 |
+| **Symmetric Crypto** | AES, DES, 3DES, RC4, Blowfish, ChaCha20 |
+| **Hash Functions** | MD5, SHA-1, SHA-2, SHA-3, BLAKE2 |
+| **TLS/SSL** | Protocol versions, cipher suites, weak configs |
+| **Keys & Secrets** | Private keys (RSA/EC/SSH/PGP), JWT secrets, HMAC keys |
+| **Cloud KMS** | AWS KMS, Azure Key Vault, GCP KMS, HashiCorp Vault |
+| **Dependencies** | Crypto libraries in 20+ package manager formats |
 
-```bash
-# Scan current directory
-cryptoscan scan .
+**50+ detection patterns** with context-aware confidence scoring.
 
-# Scan a specific path
-cryptoscan scan /path/to/project
+## Why CryptoScan
 
-# Output as JSON
-cryptoscan scan . --format json --output findings.json
+|  | CryptoScan | grep | Commercial Tools |
+|--|------------|------|------------------|
+| Quantum risk classification | Yes | No | Some |
+| Context-aware confidence | Yes | No | Varies |
+| CBOM generation | Yes | No | Rarely |
+| SARIF integration | Yes | No | Yes |
+| Migration guidance | Yes | No | Varies |
+| Open source | Yes | Yes | No |
+| Price | Free | Free | $$$$ |
 
-# Generate CBOM (Cryptographic Bill of Materials)
-cryptoscan scan . --format cbom --output crypto-bom.json
+## Quantum Risk Levels
 
-# Scan only specific file types
-cryptoscan scan . --include "*.java,*.py,*.go"
+CryptoScan classifies every finding by quantum threat:
 
-# Exclude directories
-cryptoscan scan . --exclude "vendor/*,node_modules/*"
-
-# Only show high and critical findings
-cryptoscan scan . --min-severity high
-```
+| Risk | Meaning | What Breaks It | Action |
+|------|---------|----------------|--------|
+| **VULNERABLE** | Broken by quantum | Shor's algorithm | Migrate now |
+| **PARTIAL** | Weakened by quantum | Grover's algorithm | Double key sizes |
+| **SAFE** | Quantum-resistant | N/A | You're good |
+| **UNKNOWN** | Needs review | Unknown | Investigate |
 
 ## Output Formats
 
-### Text (Default)
-Human-readable output with color-coded severity levels and quantum risk indicators.
+```bash
+# Human-readable (default)
+cryptoscan scan .
 
-### JSON
-Structured JSON output for integration with other tools:
-```json
-{
-  "findings": [...],
-  "summary": {
-    "totalFindings": 42,
-    "bySeverity": {"CRITICAL": 3, "HIGH": 12, ...},
-    "byQuantumRisk": {"VULNERABLE": 25, "PARTIAL": 10, ...}
-  }
-}
+# JSON for automation
+cryptoscan scan . --format json --output findings.json
+
+# CSV for spreadsheets
+cryptoscan scan . --format csv --output findings.csv
+
+# SARIF for GitHub Security
+cryptoscan scan . --format sarif --output results.sarif
+
+# CBOM for compliance
+cryptoscan scan . --format cbom --output crypto-bom.json
 ```
 
-### SARIF
-[Static Analysis Results Interchange Format](https://sarifweb.azurewebsites.net/) for integration with GitHub Code Scanning, VS Code, and other security tools.
+### SARIF + GitHub Code Scanning
 
-### CBOM
-[CycloneDX](https://cyclonedx.org/) Cryptographic Bill of Materials format for tracking cryptographic assets.
+```yaml
+# .github/workflows/crypto-scan.yml
+name: Crypto Scan
+on: [push, pull_request]
 
-## Quantum Risk Classification
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-| Risk Level | Description | Action Required |
-|------------|-------------|-----------------|
-| **VULNERABLE** | Algorithm broken by Shor's algorithm | Immediate migration planning |
-| **PARTIAL** | Security reduced by Grover's algorithm | Monitor, may need longer keys |
-| **SAFE** | Quantum-resistant algorithm | No action needed |
-| **UNKNOWN** | Cannot determine quantum risk | Manual review required |
+      - name: Install CryptoScan
+        run: go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@latest
 
-## Severity Levels
+      - name: Run Scan
+        run: cryptoscan scan . --format sarif --output results.sarif
 
-- **CRITICAL**: Broken algorithms, exposed secrets, must fix immediately
-- **HIGH**: Quantum-vulnerable algorithms requiring migration
-- **MEDIUM**: Suboptimal configurations needing attention
-- **LOW**: Minor issues or informational findings
-- **INFO**: Library imports and configuration patterns to audit
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+```
 
-## Command Reference
+## CLI Reference
 
 ```
 cryptoscan scan [path] [flags]
@@ -127,103 +149,83 @@ Flags:
   -e, --exclude string      File patterns to exclude (comma-separated)
   -d, --max-depth int       Maximum directory depth (0 = unlimited)
   -p, --progress            Show scan progress
-      --min-severity string Minimum severity: info, low, medium, high, critical (default "info")
+      --min-severity string Minimum severity: info, low, medium, high, critical
       --no-color            Disable colored output
       --pretty              Pretty print JSON output
-      --git-history         Scan Git history (coming soon)
 ```
 
-### Export to CSV
+### Common Workflows
 
 ```bash
-# Export findings to CSV for spreadsheet analysis
-cryptoscan scan . --format csv --output crypto-findings.csv
-
-# Open in Excel, Google Sheets, or use with pandas
-```
-
-## Examples
-
-### CI/CD Integration
-
-```yaml
-# GitHub Actions
-- name: Run CryptoScan
-  run: |
-    cryptoscan scan . --format sarif --output results.sarif
-
-- name: Upload SARIF
-  uses: github/codeql-action/upload-sarif@v2
-  with:
-    sarif_file: results.sarif
-```
-
-### Generate CBOM for Compliance
-
-```bash
-cryptoscan scan . --format cbom --output crypto-inventory.json
-```
-
-### Pre-commit Hook
-
-```bash
-#!/bin/bash
+# Focus on critical issues
 cryptoscan scan . --min-severity high
-if [ $? -ne 0 ]; then
-  echo "Critical cryptographic issues found!"
-  exit 1
-fi
+
+# Scan only source code
+cryptoscan scan . --include "*.go,*.py,*.java,*.js"
+
+# Exclude vendor directories
+cryptoscan scan . --exclude "vendor/*,node_modules/*"
+
+# Pre-commit hook
+cryptoscan scan . --min-severity critical && echo "Clean!"
 ```
-
-## Contributing
-
-Contributions are welcome! Please see our [Contributing Guidelines](CONTRIBUTING.md).
-
-## License
-
-Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ## Roadmap
 
-### Current Release (v1.0)
-- Local codebase scanning
-- 50+ crypto patterns with quantum risk classification
-- Multiple export formats (text, JSON, CSV, SARIF, CBOM)
-- Context-aware analysis
-- Dependency scanning
+### v1.0 (Current)
+- [x] Local codebase scanning
+- [x] 50+ crypto patterns
+- [x] Multiple output formats (text, JSON, CSV, SARIF, CBOM)
+- [x] Context-aware analysis
+- [x] Dependency scanning
 
-### Coming Soon
-- **Git History Scanning**: Detect crypto in historical commits
-- **Remote Repository Scanning**: Direct GitHub/GitLab URL scanning
+### v1.1
+- [ ] Git history scanning
+- [ ] Remote repository URLs
 
-### Future Releases
-- **Cloud Environment Scanning**:
-  - AWS: Scan KMS keys, ACM certificates, Secrets Manager, Parameter Store
-  - Azure: Key Vault keys/secrets, App Configuration
-  - GCP: Cloud KMS, Secret Manager, Certificate Authority Service
-- **Infrastructure-as-Code Analysis**: Terraform, CloudFormation, Pulumi crypto configs
-- **Container Image Scanning**: Detect crypto in Docker images
-- **API Discovery**: Find crypto endpoints in OpenAPI/Swagger specs
+### v2.0
+- [ ] AWS scanning (KMS, ACM, Secrets Manager)
+- [ ] Azure scanning (Key Vault)
+- [ ] GCP scanning (Cloud KMS, Secret Manager)
+- [ ] IaC analysis (Terraform, CloudFormation)
 
-## About QRAMM
+## Part of QRAMM
 
-The Quantum Readiness Assurance Maturity Model (QRAMM) is a comprehensive framework developed by [CSNP](https://csnp.org) to help organizations prepare for post-quantum cryptography. Learn more at [qramm.org](https://qramm.org).
-
-### QRAMM Toolkit
-
-CryptoScan is part of a planned suite of open-source quantum readiness tools:
+CryptoScan is part of the **Quantum Readiness Assurance Maturity Model** toolkit by [CSNP](https://csnp.org).
 
 | Tool | Purpose | Status |
 |------|---------|--------|
-| **CryptoScan** | Cryptographic discovery in codebases | Available |
-| **CryptoCBOM** | Cryptographic Bill of Materials generator | Planned |
-| **TLS-Analyzer** | TLS/SSL configuration analysis | Planned |
-| **KeyRotate** | Key rotation automation | Planned |
-| **QRAMM-CLI** | Assessment and planning interface | Planned |
+| **CryptoScan** | Crypto discovery | Available |
+| **CryptoCBOM** | Bill of Materials | Planned |
+| **TLS-Analyzer** | TLS/SSL analysis | Planned |
+| **QRAMM-CLI** | Assessment interface | Planned |
 
-## Related Resources
+Learn more at [qramm.org](https://qramm.org)
 
-- [NIST Post-Quantum Cryptography Standards](https://csrc.nist.gov/projects/post-quantum-cryptography)
-- [FIPS 203 - ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)
-- [FIPS 204 - ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
-- [FIPS 205 - SLH-DSA](https://csrc.nist.gov/pubs/fips/205/final)
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+```bash
+# Run tests
+go test -race ./...
+
+# Build
+go build -o cryptoscan ./cmd/cryptoscan
+```
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE)
+
+---
+
+<p align="center">
+  <sub>Built with conviction by <a href="https://csnp.org">CSNP</a> — Advancing cybersecurity for everyone</sub>
+</p>
+
+<p align="center">
+  <a href="https://qramm.org">Website</a> •
+  <a href="https://github.com/csnp/qramm-cryptoscan/issues">Issues</a> •
+  <a href="https://twitter.com/csnp_org">Twitter</a>
+</p>
