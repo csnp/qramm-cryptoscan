@@ -60,32 +60,49 @@ const (
 	FindingTypeProtocol   FindingType = "protocol"    // Protocol configuration (TLS, etc.)
 )
 
+// SourceContext represents lines of source code around a finding
+type SourceContext struct {
+	Lines      []SourceLine `json:"lines"`
+	StartLine  int          `json:"startLine"`
+	EndLine    int          `json:"endLine"`
+	MatchLine  int          `json:"matchLine"` // The line number where the match occurred
+}
+
+// SourceLine represents a single line of source code
+type SourceLine struct {
+	Number  int    `json:"number"`
+	Content string `json:"content"`
+	IsMatch bool   `json:"isMatch"` // True if this is the line with the finding
+}
+
 // Finding represents a single cryptographic finding
 type Finding struct {
-	ID          string            `json:"id"`
-	Type        string            `json:"type"`
-	FindingType FindingType       `json:"findingType"`
-	Category    string            `json:"category"`
-	Algorithm   string            `json:"algorithm,omitempty"`
-	KeySize     int               `json:"keySize,omitempty"`
-	File        string            `json:"file"`
-	Line        int               `json:"line"`
-	Column      int               `json:"column,omitempty"`
-	Match       string            `json:"match"`
-	Context     string            `json:"context,omitempty"`
-	Severity    Severity          `json:"severity"`
-	Quantum     QuantumRisk       `json:"quantumRisk"`
-	Confidence  Confidence        `json:"confidence"`
-	Purpose     string            `json:"purpose,omitempty"`     // What the crypto is used for
-	Language    string            `json:"language,omitempty"`    // Programming language
-	FileType    string            `json:"fileType,omitempty"`    // code, config, docs, etc.
-	Description string            `json:"description"`
-	Remediation string            `json:"remediation,omitempty"`
-	Impact      string            `json:"impact,omitempty"`      // Business impact description
-	Effort      string            `json:"effort,omitempty"`      // Migration effort estimate
-	References  []string          `json:"references,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	ID            string            `json:"id"`
+	Type          string            `json:"type"`
+	FindingType   FindingType       `json:"findingType"`
+	Category      string            `json:"category"`
+	Algorithm     string            `json:"algorithm,omitempty"`
+	KeySize       int               `json:"keySize,omitempty"`
+	File          string            `json:"file"`
+	Line          int               `json:"line"`
+	Column        int               `json:"column,omitempty"`
+	Match         string            `json:"match"`
+	Context       string            `json:"context,omitempty"`
+	SourceContext *SourceContext    `json:"sourceContext,omitempty"` // Actual source code lines
+	Severity      Severity          `json:"severity"`
+	Quantum       QuantumRisk       `json:"quantumRisk"`
+	Confidence    Confidence        `json:"confidence"`
+	Purpose       string            `json:"purpose,omitempty"`     // What the crypto is used for
+	Language      string            `json:"language,omitempty"`    // Programming language
+	FileType      string            `json:"fileType,omitempty"`    // code, config, docs, etc.
+	Description   string            `json:"description"`
+	Remediation   string            `json:"remediation,omitempty"`
+	Impact        string            `json:"impact,omitempty"`      // Business impact description
+	Effort        string            `json:"effort,omitempty"`      // Migration effort estimate
+	References    []string          `json:"references,omitempty"`
+	Tags          []string          `json:"tags,omitempty"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+	Ignored       bool              `json:"ignored,omitempty"`     // True if cryptoscan:ignore comment found
 }
 
 // Priority calculates a priority score for sorting (higher = more urgent)

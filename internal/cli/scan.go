@@ -16,16 +16,18 @@ import (
 )
 
 var (
-	outputFormat  string
-	outputFile    string
-	includeGlobs  string
-	excludeGlobs  string
-	maxDepth      int
-	showProgress  bool
-	minSeverity   string
-	noColor       bool
-	jsonPretty    bool
+	outputFormat   string
+	outputFile     string
+	includeGlobs   string
+	excludeGlobs   string
+	maxDepth       int
+	showProgress   bool
+	minSeverity    string
+	noColor        bool
+	jsonPretty     bool
 	scanGitHistory bool
+	groupBy        string
+	contextLines   int
 )
 
 var scanCmd = &cobra.Command{
@@ -68,6 +70,8 @@ func init() {
 	scanCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	scanCmd.Flags().BoolVar(&jsonPretty, "pretty", false, "Pretty print JSON output")
 	scanCmd.Flags().BoolVar(&scanGitHistory, "git-history", false, "Scan Git history (slower)")
+	scanCmd.Flags().StringVarP(&groupBy, "group-by", "g", "", "Group output by: file, severity, category, quantum")
+	scanCmd.Flags().IntVarP(&contextLines, "context", "c", 3, "Number of context lines to show around findings")
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
@@ -145,7 +149,9 @@ func runScan(cmd *cobra.Command, args []string) error {
 	case "cbom":
 		rep = reporter.NewCBOMReporter()
 	default:
-		rep = reporter.NewTextReporter(!noColor)
+		textRep := reporter.NewTextReporter(!noColor)
+		textRep.SetGroupBy(groupBy)
+		rep = textRep
 	}
 
 	// Add metadata
@@ -193,22 +199,23 @@ func printBanner() {
 	fmt.Println()
 	fmt.Println(colorCyan + colorBold + "  ╔═══════════════════════════════════════════════════════════════╗")
 	fmt.Println("  ║                                                                 ║")
-	fmt.Println("  ║   ██████╗██████╗ ██╗   ██╗██████╗ ████████╗ ██████╗ ███████╗   ║")
-	fmt.Println("  ║  ██╔════╝██╔══██╗╚██╗ ██╔╝██╔══██╗╚══██╔══╝██╔═══██╗██╔════╝   ║")
-	fmt.Println("  ║  ██║     ██████╔╝ ╚████╔╝ ██████╔╝   ██║   ██║   ██║███████╗   ║")
-	fmt.Println("  ║  ██║     ██╔══██╗  ╚██╔╝  ██╔═══╝    ██║   ██║   ██║╚════██║   ║")
-	fmt.Println("  ║  ╚██████╗██║  ██║   ██║   ██║        ██║   ╚██████╔╝███████║   ║")
-	fmt.Println("  ║   ╚═════╝╚═╝  ╚═╝   ╚═╝   ╚═╝        ╚═╝    ╚═════╝ ╚══════╝   ║")
-	fmt.Println("  ║                     ███████╗ ██████╗ █████╗ ███╗   ██╗         ║")
-	fmt.Println("  ║                     ██╔════╝██╔════╝██╔══██╗████╗  ██║         ║")
-	fmt.Println("  ║                     ███████╗██║     ███████║██╔██╗ ██║         ║")
-	fmt.Println("  ║                     ╚════██║██║     ██╔══██║██║╚██╗██║         ║")
-	fmt.Println("  ║                     ███████║╚██████╗██║  ██║██║ ╚████║         ║")
-	fmt.Println("  ║                     ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝         ║")
+	fmt.Println("  ║    ██████╗██████╗ ██╗   ██╗██████╗ ████████╗ ██████╗            ║")
+	fmt.Println("  ║   ██╔════╝██╔══██╗╚██╗ ██╔╝██╔══██╗╚══██╔══╝██╔═══██╗           ║")
+	fmt.Println("  ║   ██║     ██████╔╝ ╚████╔╝ ██████╔╝   ██║   ██║   ██║           ║")
+	fmt.Println("  ║   ██║     ██╔══██╗  ╚██╔╝  ██╔═══╝    ██║   ██║   ██║           ║")
+	fmt.Println("  ║   ╚██████╗██║  ██║   ██║   ██║        ██║   ╚██████╔╝           ║")
+	fmt.Println("  ║    ╚═════╝╚═╝  ╚═╝   ╚═╝   ╚═╝        ╚═╝    ╚═════╝            ║")
+	fmt.Println("  ║                                                                 ║")
+	fmt.Println("  ║    ███████╗ ██████╗ █████╗ ███╗   ██╗                           ║")
+	fmt.Println("  ║    ██╔════╝██╔════╝██╔══██╗████╗  ██║                           ║")
+	fmt.Println("  ║    ███████╗██║     ███████║██╔██╗ ██║                           ║")
+	fmt.Println("  ║    ╚════██║██║     ██╔══██║██║╚██╗██║                           ║")
+	fmt.Println("  ║    ███████║╚██████╗██║  ██║██║ ╚████║                           ║")
+	fmt.Println("  ║    ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝                           ║")
 	fmt.Println("  ║                                                                 ║")
 	fmt.Println("  ╚═══════════════════════════════════════════════════════════════╝" + colorReset)
 	fmt.Println()
-	fmt.Println(colorBlue + "  QRAMM Cryptographic Discovery Scanner" + colorReset)
+	fmt.Println(colorBlue + "  Crypto Scan — QRAMM Cryptographic Discovery" + colorReset)
 	fmt.Println(colorDim + "  Quantum Readiness Assurance & Migration Tool" + colorReset)
 	fmt.Println()
 	fmt.Println(colorGreen + "  ┌─────────────────────────────────────────────────────────────┐")

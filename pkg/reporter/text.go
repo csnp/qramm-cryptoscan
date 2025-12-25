@@ -13,11 +13,17 @@ import (
 // TextReporter generates human-readable text output
 type TextReporter struct {
 	colorEnabled bool
+	groupBy      string
 }
 
 // NewTextReporter creates a new text reporter
 func NewTextReporter(colorEnabled bool) *TextReporter {
 	return &TextReporter{colorEnabled: colorEnabled}
+}
+
+// SetGroupBy sets the grouping mode for output
+func (r *TextReporter) SetGroupBy(groupBy string) {
+	r.groupBy = groupBy
 }
 
 // ANSI color codes
@@ -167,6 +173,11 @@ func (r *TextReporter) Generate(results *scanner.Results) (string, error) {
 	b.WriteString(r.color(colorBold, "╚═══════════════════════════════════════════════════════════════╝\n"))
 	b.WriteString("\n")
 
+	// Handle grouped output
+	if r.groupBy == "file" {
+		return r.generateGroupedByFile(results, &b)
+	}
+
 	for i, f := range results.Findings {
 		// Finding number and severity badge
 		sevColor := r.severityColor(f.Severity)
@@ -185,7 +196,33 @@ func (r *TextReporter) Generate(results *scanner.Results) (string, error) {
 			r.color(colorBold, "File:"),
 			f.File, f.Line))
 
-		// Match
+		// Source code context - the key feature for verification
+		if f.SourceContext != nil && len(f.SourceContext.Lines) > 0 {
+			b.WriteString(fmt.Sprintf("  │\n"))
+			b.WriteString(fmt.Sprintf("  │ %s\n", r.color(colorBold, "Source:")))
+			b.WriteString(fmt.Sprintf("  │ %s\n", r.color(colorCyan, "┌────────────────────────────────────────────────────────")))
+			for _, srcLine := range f.SourceContext.Lines {
+				linePrefix := "  │ │"
+				lineNumStr := fmt.Sprintf("%4d", srcLine.Number)
+				if srcLine.IsMatch {
+					// Highlight the matching line with arrow and color
+					b.WriteString(fmt.Sprintf("%s %s %s %s\n",
+						linePrefix,
+						r.color(colorRed+colorBold, "→"),
+						r.color(colorYellow, lineNumStr),
+						r.color(colorRed+colorBold, srcLine.Content)))
+				} else {
+					b.WriteString(fmt.Sprintf("%s   %s %s\n",
+						linePrefix,
+						r.color(colorCyan, lineNumStr),
+						r.color(colorReset, srcLine.Content)))
+				}
+			}
+			b.WriteString(fmt.Sprintf("  │ %s\n", r.color(colorCyan, "└────────────────────────────────────────────────────────")))
+			b.WriteString(fmt.Sprintf("  │\n"))
+		}
+
+		// Match (what pattern was detected)
 		b.WriteString(fmt.Sprintf("  │ %s %s\n",
 			r.color(colorBold, "Match:"),
 			r.color(colorMagenta, f.Match)))
@@ -248,9 +285,94 @@ func (r *TextReporter) Generate(results *scanner.Results) (string, error) {
 	return b.String(), nil
 }
 
+// generateGroupedByFile generates output grouped by file
+func (r *TextReporter) generateGroupedByFile(results *scanner.Results, b *strings.Builder) (string, error) {
+	// Group findings by file
+	byFile := make(map[string][]scanner.Finding)
+	for _, f := range results.Findings {
+		byFile[f.File] = append(byFile[f.File], f)
+	}
+
+	// Sort files for consistent output
+	files := make([]string, 0, len(byFile))
+	for f := range byFile {
+		files = append(files, f)
+	}
+	// Sort by number of findings (most first), then alphabetically
+	for i := 0; i < len(files)-1; i++ {
+		for j := i + 1; j < len(files); j++ {
+			if len(byFile[files[i]]) < len(byFile[files[j]]) {
+				files[i], files[j] = files[j], files[i]
+			} else if len(byFile[files[i]]) == len(byFile[files[j]]) && files[i] > files[j] {
+				files[i], files[j] = files[j], files[i]
+			}
+		}
+	}
+
+	findingNum := 0
+	for _, file := range files {
+		findings := byFile[file]
+
+		// File header
+		b.WriteString(r.color(colorBold+colorCyan, fmt.Sprintf("  ━━━ %s ", file)))
+		b.WriteString(r.color(colorYellow, fmt.Sprintf("(%d findings)", len(findings))))
+		b.WriteString(r.color(colorBold+colorCyan, " ━━━\n"))
+		b.WriteString("\n")
+
+		for _, f := range findings {
+			findingNum++
+			sevColor := r.severityColor(f.Severity)
+
+			// Compact finding display
+			b.WriteString(fmt.Sprintf("    %s #%d %s Line %d\n",
+				r.color(sevColor, fmt.Sprintf("[%s]", f.Severity.String())),
+				findingNum,
+				r.color(colorBold, f.Type),
+				f.Line))
+
+			// Source code context
+			if f.SourceContext != nil && len(f.SourceContext.Lines) > 0 {
+				b.WriteString(r.color(colorCyan, "    ┌──────────────────────────────────────────────────\n"))
+				for _, srcLine := range f.SourceContext.Lines {
+					lineNumStr := fmt.Sprintf("%4d", srcLine.Number)
+					if srcLine.IsMatch {
+						b.WriteString(fmt.Sprintf("    │ %s %s %s\n",
+							r.color(colorRed+colorBold, "→"),
+							r.color(colorYellow, lineNumStr),
+							r.color(colorRed+colorBold, srcLine.Content)))
+					} else {
+						b.WriteString(fmt.Sprintf("    │   %s %s\n",
+							r.color(colorCyan, lineNumStr),
+							srcLine.Content))
+					}
+				}
+				b.WriteString(r.color(colorCyan, "    └──────────────────────────────────────────────────\n"))
+			}
+
+			// Match and quantum risk on one line
+			b.WriteString(fmt.Sprintf("    %s %s  •  %s\n",
+				r.color(colorBold, "Match:"),
+				r.color(colorMagenta, f.Match),
+				r.quantumIcon(f.Quantum)))
+
+			// Remediation (compact)
+			if f.Remediation != "" {
+				b.WriteString(fmt.Sprintf("    %s %s\n",
+					r.color(colorGreen+colorBold, "Fix:"),
+					r.color(colorGreen, f.Remediation)))
+			}
+
+			b.WriteString("\n")
+		}
+	}
+
+	r.writeFooter(b)
+	return b.String(), nil
+}
+
 func (r *TextReporter) writeFooter(b *strings.Builder) {
 	b.WriteString(r.color(colorBold, "═══════════════════════════════════════════════════════════════\n"))
-	b.WriteString(r.color(colorCyan, "  QRAMM Cryptographic Scanner") + " - Part of the QRAMM Toolkit\n")
+	b.WriteString(r.color(colorCyan, "  Crypto Scan") + " - Part of the QRAMM Toolkit\n")
 	b.WriteString("  https://qramm.org  •  https://csnp.org\n")
 	b.WriteString("\n")
 	b.WriteString(r.color(colorGreen, "  CSNP Mission: ") + "Advancing cybersecurity through education,\n")

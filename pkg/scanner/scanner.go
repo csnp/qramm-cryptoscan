@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -104,6 +105,7 @@ type Scanner struct {
 	patterns *patterns.Matcher
 	mu       sync.Mutex
 	findings []Finding
+	tempDir  string // Temporary directory for cloned repos
 	stats    struct {
 		filesScanned  int
 		linesScanned  int
@@ -135,8 +137,16 @@ func New(cfg Config) *Scanner {
 // Scan performs the scan and returns results
 func (s *Scanner) Scan() (*Results, error) {
 	target := s.config.Target
+
+	// Handle Git URL - clone to temp directory
 	if isGitURL(target) {
-		return nil, fmt.Errorf("git URL scanning not yet implemented - clone locally first")
+		clonePath, err := s.cloneRepository(target)
+		if err != nil {
+			return nil, fmt.Errorf("failed to clone repository: %w", err)
+		}
+		// Clean up temp directory when done
+		defer s.Cleanup()
+		target = clonePath
 	}
 
 	info, err := os.Stat(target)
@@ -172,6 +182,38 @@ func (s *Scanner) Scan() (*Results, error) {
 	results.Insights = s.generateInsights()
 
 	return results, nil
+}
+
+// cloneRepository clones a Git repository to a temporary directory
+func (s *Scanner) cloneRepository(url string) (string, error) {
+	// Create temp directory
+	tempDir, err := os.MkdirTemp("", "cryptoscan-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	s.tempDir = tempDir
+
+	// Print status
+	fmt.Printf("  Cloning %s...\n", url)
+
+	// Clone with shallow depth for speed, quiet mode
+	cmd := exec.Command("git", "clone", "--depth", "1", "--single-branch", "--quiet", url, tempDir)
+
+	if err := cmd.Run(); err != nil {
+		os.RemoveAll(tempDir)
+		return "", fmt.Errorf("git clone failed: %w", err)
+	}
+
+	fmt.Printf("  Clone complete. Scanning...\n\n")
+	return tempDir, nil
+}
+
+// Cleanup removes temporary files created during scanning
+func (s *Scanner) Cleanup() {
+	if s.tempDir != "" {
+		os.RemoveAll(s.tempDir)
+		s.tempDir = ""
+	}
 }
 
 func (s *Scanner) scanDirectory(root string) error {
@@ -290,22 +332,25 @@ func (s *Scanner) scanFile(path string) error {
 		return s.scanDependencyFile(path, fileCtx)
 	}
 
-	scanner := bufio.NewScanner(file)
-	// Increase buffer size for long lines (e.g., minified files, go.sum)
-	const maxScanTokenSize = 1024 * 1024 // 1MB
-	buf := make([]byte, maxScanTokenSize)
-	scanner.Buffer(buf, maxScanTokenSize)
+	// Read all lines first for context extraction
+	allLines, err := s.readFileLines(path)
+	if err != nil {
+		return nil
+	}
 
-	lineNum := 0
 	var prevLines []string
 
-	for scanner.Scan() {
-		lineNum++
-		line := scanner.Text()
+	for lineNum, line := range allLines {
+		lineNum++ // Convert to 1-based
 
 		s.mu.Lock()
 		s.stats.linesScanned++
 		s.mu.Unlock()
+
+		// Check for ignore comment on this line or previous line
+		if s.hasIgnoreComment(line, allLines, lineNum) {
+			continue
+		}
 
 		// Get line context
 		lineCtx := analyzer.AnalyzeLine(line, fileCtx.Language, prevLines)
@@ -329,6 +374,9 @@ func (s *Scanner) scanFile(path string) error {
 				continue
 			}
 
+			// Add source context (3 lines before and after)
+			m.SourceContext = s.extractSourceContext(allLines, lineNum, 3)
+
 			// Apply severity filter
 			if m.Severity >= s.config.MinSeverity {
 				s.mu.Lock()
@@ -344,7 +392,87 @@ func (s *Scanner) scanFile(path string) error {
 		}
 	}
 
-	return scanner.Err()
+	return nil
+}
+
+// readFileLines reads all lines from a file
+func (s *Scanner) readFileLines(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	const maxScanTokenSize = 1024 * 1024 // 1MB
+	buf := make([]byte, maxScanTokenSize)
+	scanner.Buffer(buf, maxScanTokenSize)
+
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
+}
+
+// hasIgnoreComment checks if this line should be ignored via cryptoscan:ignore
+func (s *Scanner) hasIgnoreComment(line string, allLines []string, lineNum int) bool {
+	lowerLine := strings.ToLower(line)
+
+	// Check inline comment on same line
+	if strings.Contains(lowerLine, "cryptoscan:ignore") ||
+	   strings.Contains(lowerLine, "crypto-scan:ignore") ||
+	   strings.Contains(lowerLine, "noscan") {
+		return true
+	}
+
+	// Check previous line for ignore directive
+	if lineNum >= 2 && lineNum-2 < len(allLines) {
+		prevLine := strings.ToLower(allLines[lineNum-2])
+		if strings.Contains(prevLine, "cryptoscan:ignore") ||
+		   strings.Contains(prevLine, "crypto-scan:ignore") ||
+		   strings.Contains(prevLine, "cryptoscan:ignore-next-line") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// extractSourceContext extracts lines around a finding for display
+func (s *Scanner) extractSourceContext(allLines []string, lineNum int, contextLines int) *types.SourceContext {
+	startLine := lineNum - contextLines
+	if startLine < 1 {
+		startLine = 1
+	}
+	endLine := lineNum + contextLines
+	if endLine > len(allLines) {
+		endLine = len(allLines)
+	}
+
+	ctx := &types.SourceContext{
+		StartLine: startLine,
+		EndLine:   endLine,
+		MatchLine: lineNum,
+		Lines:     make([]types.SourceLine, 0, endLine-startLine+1),
+	}
+
+	for i := startLine; i <= endLine; i++ {
+		if i-1 < len(allLines) {
+			content := allLines[i-1]
+			// Truncate very long lines for display
+			if len(content) > 200 {
+				content = content[:200] + "..."
+			}
+			ctx.Lines = append(ctx.Lines, types.SourceLine{
+				Number:  i,
+				Content: content,
+				IsMatch: i == lineNum,
+			})
+		}
+	}
+
+	return ctx
 }
 
 func (s *Scanner) scanDependencyFile(path string, fileCtx *analyzer.FileContext) error {

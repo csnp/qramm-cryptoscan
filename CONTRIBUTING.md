@@ -1,6 +1,6 @@
-# Contributing to CryptoScan
+# Contributing to Crypto Scan
 
-Thank you for your interest in contributing to CryptoScan! This project is part of the QRAMM toolkit by CSNP, and we welcome contributions from the community.
+Thank you for your interest in contributing to Crypto Scan! This project is part of the QRAMM toolkit by CSNP, and we welcome contributions from the community.
 
 ## Code of Conduct
 

@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="https://qramm.org/images/cryptoscan-logo.svg" alt="CryptoScan" width="400">
+  <img src="https://qramm.org/images/cryptoscan-logo.svg" alt="Crypto Scan" width="400">
 </p>
 
 <h3 align="center">Discover. Assess. Migrate.</h3>
 
 <p align="center">
-  <strong>The open-source crypto discovery tool for the post-quantum era</strong>
+  <strong>The open-source cryptographic discovery tool for the post-quantum era</strong>
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@
 
 **Quantum computers will break RSA, ECDSA, and DH within the next decade.** The NSA, NIST, and major tech companies are already migrating. But you can't migrate what you can't find.
 
-CryptoScan solves this by scanning your entire codebase in seconds, identifying every cryptographic algorithm, key, and configuration that needs attention.
+Crypto Scan solves this by scanning your entire codebase in seconds, identifying every cryptographic algorithm, key, and configuration that needs attention — with full source code context so you can verify findings and know exactly where to make fixes.
 
 ## Quick Start
 
@@ -40,6 +40,9 @@ go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@latest
 
 # Scan your project
 cryptoscan scan .
+
+# Scan a remote Git repository
+cryptoscan scan https://github.com/org/repo.git
 
 # That's it. You now know your quantum risk.
 ```
@@ -70,10 +73,14 @@ go build -o cryptoscan ./cmd/cryptoscan
 
 **50+ detection patterns** with context-aware confidence scoring.
 
-## Why CryptoScan
+## Why Crypto Scan
 
-|  | CryptoScan | grep | Commercial Tools |
-|--|------------|------|------------------|
+|  | Crypto Scan | grep | Commercial Tools |
+|--|-------------|------|------------------|
+| **Remote Git URL scanning** | **Yes** | No | Some |
+| **Source code context** | **Yes** | No | Rarely |
+| Inline ignore comments | Yes | No | Some |
+| Group-by-file output | Yes | No | Varies |
 | Quantum risk classification | Yes | No | Some |
 | Context-aware confidence | Yes | No | Varies |
 | CBOM generation | Yes | No | Rarely |
@@ -84,7 +91,7 @@ go build -o cryptoscan ./cmd/cryptoscan
 
 ## Quantum Risk Levels
 
-CryptoScan classifies every finding by quantum threat:
+Crypto Scan classifies every finding by quantum threat:
 
 | Risk | Meaning | What Breaks It | Action |
 |------|---------|----------------|--------|
@@ -148,6 +155,8 @@ Flags:
   -i, --include string      File patterns to include (comma-separated)
   -e, --exclude string      File patterns to exclude (comma-separated)
   -d, --max-depth int       Maximum directory depth (0 = unlimited)
+  -g, --group-by string     Group output by: file, severity, category, quantum
+  -c, --context int         Lines of source context to show (default 3)
   -p, --progress            Show scan progress
       --min-severity string Minimum severity: info, low, medium, high, critical
       --no-color            Disable colored output
@@ -160,6 +169,9 @@ Flags:
 # Focus on critical issues
 cryptoscan scan . --min-severity high
 
+# Group findings by file for easier review
+cryptoscan scan . --group-by file
+
 # Scan only source code
 cryptoscan scan . --include "*.go,*.py,*.java,*.js"
 
@@ -169,6 +181,23 @@ cryptoscan scan . --exclude "vendor/*,node_modules/*"
 # Pre-commit hook
 cryptoscan scan . --min-severity critical && echo "Clean!"
 ```
+
+### Inline Ignore Comments
+
+Suppress false positives with inline comments:
+
+```go
+key := rsa.GenerateKey(rand.Reader, 2048) // cryptoscan:ignore
+
+// cryptoscan:ignore-next-line
+legacyKey := oldCrypto.NewKey()
+```
+
+Supported directives:
+- `cryptoscan:ignore` — ignore this line
+- `cryptoscan:ignore-next-line` — ignore the following line
+- `crypto-scan:ignore` — alternative format
+- `noscan` — quick ignore
 
 ## Roadmap
 
@@ -191,14 +220,14 @@ cryptoscan scan . --min-severity critical && echo "Clean!"
 
 ## Part of QRAMM
 
-CryptoScan is part of the **Quantum Readiness Assurance Maturity Model** toolkit by [CSNP](https://csnp.org).
+Crypto Scan is part of the **Quantum Readiness Assurance Maturity Model** toolkit by [CSNP](https://csnp.org).
 
 | Tool | Purpose | Status |
 |------|---------|--------|
-| **CryptoScan** | Crypto discovery | Available |
-| **CryptoCBOM** | Bill of Materials | Planned |
-| **TLS-Analyzer** | TLS/SSL analysis | Planned |
-| **QRAMM-CLI** | Assessment interface | Planned |
+| **Crypto Scan** | Cryptographic discovery | Available |
+| **Crypto CBOM** | Bill of Materials | Planned |
+| **TLS Analyzer** | TLS/SSL analysis | Planned |
+| **QRAMM CLI** | Assessment interface | Planned |
 
 Learn more at [qramm.org](https://qramm.org)
 
