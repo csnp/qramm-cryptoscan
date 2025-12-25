@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/csnp/qramm-cryptoscan/pkg/analyzer"
 	"github.com/csnp/qramm-cryptoscan/pkg/types"
 )
 
@@ -78,6 +79,147 @@ func truncateContext(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// MatchWithContext checks a line against all patterns with file and line context
+func (m *Matcher) MatchWithContext(line, file string, lineNum int, fileCtx *analyzer.FileContext, lineCtx *analyzer.LineContext) []types.Finding {
+	var findings []types.Finding
+
+	for _, p := range m.patterns {
+		matches := p.Regex.FindAllStringIndex(line, -1)
+		for _, match := range matches {
+			finding := types.Finding{
+				ID:          fmt.Sprintf("%s-%d-%d", p.ID, lineNum, match[0]),
+				Type:        p.Name,
+				FindingType: determineFindingType(p),
+				Category:    p.Category,
+				Algorithm:   p.Algorithm,
+				KeySize:     p.KeySize,
+				File:        file,
+				Line:        lineNum,
+				Column:      match[0] + 1,
+				Match:       line[match[0]:match[1]],
+				Context:     truncateContext(line, 120),
+				Severity:    p.Severity,
+				Quantum:     p.Quantum,
+				Description: p.Description,
+				Remediation: p.Remediation,
+				References:  p.References,
+				Tags:        p.Tags,
+			}
+
+			// Apply context-aware enhancements
+			if fileCtx != nil {
+				finding.Language = string(fileCtx.Language)
+				finding.FileType = string(fileCtx.FileType)
+
+				// Reduce severity for documentation and test files
+				if fileCtx.FileType == analyzer.FileTypeDocumentation {
+					finding.Severity = adjustSeverityDown(finding.Severity, 2)
+					finding.Confidence = types.ConfidenceLow
+				} else if fileCtx.FileType == analyzer.FileTypeTest {
+					finding.Severity = adjustSeverityDown(finding.Severity, 1)
+					finding.Confidence = types.ConfidenceMedium
+				} else if fileCtx.IsVendor || fileCtx.IsGenerated {
+					finding.Confidence = types.ConfidenceMedium
+				}
+			}
+
+			if lineCtx != nil {
+				finding.Purpose = lineCtx.Purpose
+				// Override confidence from line context if not already set
+				if finding.Confidence == "" {
+					finding.Confidence = lineCtx.Confidence
+				}
+				// Reduce confidence for comments
+				if lineCtx.IsComment {
+					finding.Confidence = types.ConfidenceLow
+					finding.Severity = adjustSeverityDown(finding.Severity, 2)
+				}
+			}
+
+			// Default confidence if still not set
+			if finding.Confidence == "" {
+				finding.Confidence = types.ConfidenceHigh
+			}
+
+			// Set impact and effort based on finding characteristics
+			finding.Impact = determineImpact(finding)
+			finding.Effort = determineEffort(finding)
+
+			findings = append(findings, finding)
+		}
+	}
+
+	return findings
+}
+
+// determineFindingType categorizes the pattern type
+func determineFindingType(p Pattern) types.FindingType {
+	switch p.Category {
+	case "Secret Detection":
+		return types.FindingTypeSecret
+	case "Library Import":
+		return types.FindingTypeAlgorithm
+	case "Deprecated Protocol", "TLS/SSL":
+		return types.FindingTypeProtocol
+	case "Configuration":
+		return types.FindingTypeConfig
+	default:
+		return types.FindingTypeAlgorithm
+	}
+}
+
+// adjustSeverityDown reduces severity by n levels
+func adjustSeverityDown(s types.Severity, n int) types.Severity {
+	newSev := int(s) - n
+	if newSev < 0 {
+		return types.SeverityInfo
+	}
+	return types.Severity(newSev)
+}
+
+// determineImpact returns business impact description
+func determineImpact(f types.Finding) string {
+	if f.FindingType == types.FindingTypeSecret {
+		return "Critical: Exposed cryptographic secrets can lead to complete system compromise"
+	}
+	switch f.Quantum {
+	case types.QuantumVulnerable:
+		switch f.Severity {
+		case types.SeverityCritical:
+			return "Data protected by this algorithm is vulnerable to harvest-now-decrypt-later attacks"
+		case types.SeverityHigh:
+			return "Long-term data confidentiality at risk from quantum computing advances"
+		default:
+			return "Algorithm requires migration before quantum computers become practical"
+		}
+	case types.QuantumPartial:
+		return "Reduced security margin against quantum attacks; acceptable with increased key sizes"
+	}
+	return "Standard cryptographic maintenance recommended"
+}
+
+// determineEffort returns migration effort estimate
+func determineEffort(f types.Finding) string {
+	if f.FindingType == types.FindingTypeSecret {
+		return "Immediate action required - rotate secrets and remove from code"
+	}
+	if f.FindingType == types.FindingTypeConfig {
+		return "Configuration change - low effort"
+	}
+	if f.FindingType == types.FindingTypeDependency {
+		return "Library upgrade - medium effort, requires testing"
+	}
+	switch f.Category {
+	case "Asymmetric Encryption", "Key Exchange":
+		return "Algorithm replacement - high effort, requires PKI changes"
+	case "Symmetric Encryption", "Hash Function":
+		return "Algorithm replacement - medium effort"
+	case "Deprecated Protocol":
+		return "Protocol upgrade - medium to high effort depending on infrastructure"
+	}
+	return "Assessment needed"
 }
 
 func (m *Matcher) loadPatterns() {
@@ -164,7 +306,7 @@ func (m *Matcher) loadPatterns() {
 		ID:          "DH-001",
 		Name:        "Diffie-Hellman Key Exchange",
 		Category:    "Key Exchange",
-		Regex:       regexp.MustCompile(`(?i)\b(DiffieHellman|Diffie[-_]?Hellman|DHE|ECDHE|DH[-_]?(1024|2048|3072|4096)?)\b`),
+		Regex:       regexp.MustCompile(`(?i)\b(DiffieHellman|Diffie[-_]?Hellman|DHE[-_]|ECDHE[-_]?|DH[-_](1024|2048|3072|4096)|KeyExchange.*DH|DH.*KeyExchange)\b`),
 		Severity:    types.SeverityHigh,
 		Quantum:     types.QuantumVulnerable,
 		Algorithm:   "DH",
