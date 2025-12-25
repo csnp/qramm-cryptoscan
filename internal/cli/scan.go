@@ -118,10 +118,24 @@ func runScan(cmd *cobra.Command, args []string) error {
 
 	// Setup streaming output for text format
 	findingCount := 0
+	fileCount := 0
 	if streamFindings && outputFormat == "text" {
 		cfg.OnFinding = func(f scanner.Finding) {
 			findingCount++
+			// Clear the progress line before printing finding
+			fmt.Print("\r\033[K")
 			printStreamFinding(f, findingCount, !noColor)
+		}
+		cfg.OnFileScanned = func(path string) {
+			fileCount++
+			// Show progress every 10 files (avoids too much output)
+			if fileCount%10 == 0 {
+				shortPath := path
+				if len(shortPath) > 50 {
+					shortPath = "..." + shortPath[len(shortPath)-47:]
+				}
+				fmt.Printf("\r\033[K  \033[2m📂 %d files scanned | %s\033[0m", fileCount, shortPath)
+			}
 		}
 	}
 
@@ -154,8 +168,10 @@ func runScan(cmd *cobra.Command, args []string) error {
 	duration := time.Since(startTime)
 
 	// Print streaming footer with summary
-	if streamFindings && outputFormat == "text" && findingCount > 0 {
-		printScanningFooter(findingCount, duration, !noColor)
+	if streamFindings && outputFormat == "text" {
+		// Clear any remaining progress line
+		fmt.Print("\r\033[K")
+		printScanningFooter(findingCount, fileCount, duration, !noColor)
 	}
 
 	// Create reporter
@@ -270,7 +286,7 @@ func printScanningHeader(useColor bool) {
 	}
 }
 
-func printScanningFooter(count int, duration time.Duration, useColor bool) {
+func printScanningFooter(findingCount, fileCount int, duration time.Duration, useColor bool) {
 	const (
 		colorGreen = "\033[32m"
 		colorBold  = "\033[1m"
@@ -280,10 +296,10 @@ func printScanningFooter(count int, duration time.Duration, useColor bool) {
 
 	fmt.Println()
 	if useColor {
-		fmt.Printf("%s%s  ✓ Scan complete%s — %d findings in %s\n\n",
-			colorGreen, colorBold, colorReset, count, duration.Round(time.Millisecond))
+		fmt.Printf("%s%s  ✓ Scan complete%s — %d findings in %d files (%s)\n\n",
+			colorGreen, colorBold, colorReset, findingCount, fileCount, duration.Round(time.Millisecond))
 	} else {
-		fmt.Printf("  Scan complete — %d findings in %s\n\n", count, duration.Round(time.Millisecond))
+		fmt.Printf("  Scan complete — %d findings in %d files (%s)\n\n", findingCount, fileCount, duration.Round(time.Millisecond))
 	}
 }
 
