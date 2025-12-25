@@ -28,6 +28,7 @@ var (
 	scanGitHistory bool
 	groupBy        string
 	contextLines   int
+	streamFindings bool
 )
 
 var scanCmd = &cobra.Command{
@@ -72,6 +73,7 @@ func init() {
 	scanCmd.Flags().BoolVar(&scanGitHistory, "git-history", false, "Scan Git history (slower)")
 	scanCmd.Flags().StringVarP(&groupBy, "group-by", "g", "", "Group output by: file, severity, category, quantum")
 	scanCmd.Flags().IntVarP(&contextLines, "context", "c", 3, "Number of context lines to show around findings")
+	scanCmd.Flags().BoolVar(&streamFindings, "stream", true, "Show findings as they are discovered")
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
@@ -114,6 +116,15 @@ func runScan(cmd *cobra.Command, args []string) error {
 		MinSeverity:    parseSeverity(minSeverity),
 	}
 
+	// Setup streaming output for text format
+	findingCount := 0
+	if streamFindings && outputFormat == "text" {
+		cfg.OnFinding = func(f scanner.Finding) {
+			findingCount++
+			printStreamFinding(f, findingCount, !noColor)
+		}
+	}
+
 	// Resolve target path
 	if !isURL(target) {
 		absPath, err := filepath.Abs(target)
@@ -128,6 +139,11 @@ func runScan(cmd *cobra.Command, args []string) error {
 		printBanner()
 	}
 
+	// Print streaming header
+	if streamFindings && outputFormat == "text" {
+		printScanningHeader(!noColor)
+	}
+
 	// Run scanner
 	startTime := time.Now()
 	s := scanner.New(cfg)
@@ -136,6 +152,11 @@ func runScan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 	duration := time.Since(startTime)
+
+	// Print streaming footer with summary
+	if streamFindings && outputFormat == "text" && findingCount > 0 {
+		printScanningFooter(findingCount, duration, !noColor)
+	}
 
 	// Create reporter
 	var rep reporter.Reporter
@@ -230,6 +251,111 @@ func printBanner() {
 
 func isURL(s string) bool {
 	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "git@")
+}
+
+func printScanningHeader(useColor bool) {
+	const (
+		colorCyan  = "\033[36m"
+		colorBold  = "\033[1m"
+		colorReset = "\033[0m"
+		colorDim   = "\033[2m"
+	)
+
+	if useColor {
+		fmt.Printf("%s%s  ⏳ Scanning...%s %s(findings appear as discovered)%s\n\n",
+			colorCyan, colorBold, colorReset, colorDim, colorReset)
+	} else {
+		fmt.Println("  Scanning... (findings appear as discovered)")
+		fmt.Println()
+	}
+}
+
+func printScanningFooter(count int, duration time.Duration, useColor bool) {
+	const (
+		colorGreen = "\033[32m"
+		colorBold  = "\033[1m"
+		colorReset = "\033[0m"
+		colorDim   = "\033[2m"
+	)
+
+	fmt.Println()
+	if useColor {
+		fmt.Printf("%s%s  ✓ Scan complete%s — %d findings in %s\n\n",
+			colorGreen, colorBold, colorReset, count, duration.Round(time.Millisecond))
+	} else {
+		fmt.Printf("  Scan complete — %d findings in %s\n\n", count, duration.Round(time.Millisecond))
+	}
+}
+
+// printStreamFinding prints a compact finding line during scanning
+func printStreamFinding(f scanner.Finding, num int, useColor bool) {
+	const (
+		colorReset   = "\033[0m"
+		colorRed     = "\033[31m"
+		colorYellow  = "\033[33m"
+		colorBlue    = "\033[34m"
+		colorCyan    = "\033[36m"
+		colorMagenta = "\033[35m"
+		colorBold    = "\033[1m"
+		colorDim     = "\033[2m"
+	)
+
+	// Severity icon and color
+	var sevIcon, sevColor string
+	switch f.Severity {
+	case scanner.SeverityCritical:
+		sevIcon, sevColor = "🔴", colorRed+colorBold
+	case scanner.SeverityHigh:
+		sevIcon, sevColor = "🟠", colorRed
+	case scanner.SeverityMedium:
+		sevIcon, sevColor = "🟡", colorYellow
+	case scanner.SeverityLow:
+		sevIcon, sevColor = "🔵", colorBlue
+	default:
+		sevIcon, sevColor = "⚪", colorCyan
+	}
+
+	// Quantum risk indicator
+	var qIcon string
+	switch f.Quantum {
+	case scanner.QuantumVulnerable:
+		qIcon = "⚠️ "
+	case scanner.QuantumPartial:
+		qIcon = "⚡"
+	default:
+		qIcon = "  "
+	}
+
+	// Truncate file path for display
+	file := f.File
+	if len(file) > 40 {
+		file = "..." + file[len(file)-37:]
+	}
+
+	// Format output
+	if useColor {
+		fmt.Printf("  %s %s%-8s%s %s#%-3d%s %-22s %s%s:%d%s %s\n",
+			sevIcon,
+			sevColor, f.Severity.String(), colorReset,
+			colorDim, num, colorReset,
+			truncate(f.Type, 22),
+			colorMagenta, file, f.Line, colorReset,
+			qIcon)
+	} else {
+		fmt.Printf("  [%s] #%-3d %-22s %s:%d %s\n",
+			f.Severity.String(),
+			num,
+			truncate(f.Type, 22),
+			file, f.Line,
+			qIcon)
+	}
+}
+
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max-3] + "..."
 }
 
 func parseSeverity(s string) scanner.Severity {

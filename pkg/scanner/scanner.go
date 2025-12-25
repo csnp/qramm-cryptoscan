@@ -52,7 +52,9 @@ type Config struct {
 	ScanDependencies bool
 	MinSeverity      Severity
 	MinConfidence    Confidence
-	IncludeDocs      bool // Whether to include documentation files
+	IncludeDocs      bool               // Whether to include documentation files
+	OnFinding        func(Finding)      // Callback when a finding is discovered (for streaming output)
+	OnFileScanned    func(path string)  // Callback when a file is scanned (for progress)
 }
 
 // Results contains all scan results
@@ -327,6 +329,11 @@ func (s *Scanner) scanFile(path string) error {
 	s.stats.languageStats[string(fileCtx.Language)]++
 	s.mu.Unlock()
 
+	// Progress callback
+	if s.config.OnFileScanned != nil {
+		s.config.OnFileScanned(path)
+	}
+
 	// Check if this is a dependency file
 	if fileCtx.FileType == analyzer.FileTypeDependency {
 		return s.scanDependencyFile(path, fileCtx)
@@ -382,6 +389,11 @@ func (s *Scanner) scanFile(path string) error {
 				s.mu.Lock()
 				s.findings = append(s.findings, m)
 				s.mu.Unlock()
+
+				// Stream finding via callback
+				if s.config.OnFinding != nil {
+					s.config.OnFinding(m)
+				}
 			}
 		}
 
@@ -509,6 +521,11 @@ func (s *Scanner) scanDependencyFile(path string, fileCtx *analyzer.FileContext)
 		s.mu.Lock()
 		s.findings = append(s.findings, finding)
 		s.mu.Unlock()
+
+		// Stream finding via callback
+		if s.config.OnFinding != nil {
+			s.config.OnFinding(finding)
+		}
 	}
 
 	return nil
