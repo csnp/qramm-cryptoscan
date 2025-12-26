@@ -45,3 +45,6 @@ CLAUDE.md
 .cursorrules
 .aider*
 .copilot/
+
+# Private/internal files
+.private/

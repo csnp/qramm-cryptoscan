@@ -238,16 +238,7 @@ Supported directives:
 
 ## Part of QRAMM
 
-Crypto Scan is part of the **Quantum Readiness Assurance Maturity Model** toolkit by [CSNP](https://csnp.org).
-
-| Tool | Purpose | Status |
-|------|---------|--------|
-| **Crypto Scan** | Cryptographic discovery | Available |
-| **Crypto CBOM** | Bill of Materials | Planned |
-| **TLS Analyzer** | TLS/SSL analysis | Planned |
-| **QRAMM CLI** | Assessment interface | Planned |
-
-Learn more at [qramm.org](https://qramm.org)
+Crypto Scan is part of the **Quantum Readiness Assurance Maturity Model** toolkit by [CSNP](https://csnp.org). Learn more at [qramm.org](https://qramm.org)
 
 ## Contributing
 
