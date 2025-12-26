@@ -47,6 +47,27 @@ cryptoscan scan https://github.com/org/repo.git
 # That's it. You now know your quantum risk.
 ```
 
+### Try It Out
+
+This repository includes sample cryptographic code for testing the scanner:
+
+```bash
+# Clone the repo
+git clone https://github.com/csnp/qramm-cryptoscan.git
+cd qramm-cryptoscan
+
+# Build the scanner
+go build -o cryptoscan ./cmd/cryptoscan
+
+# Scan the sample crypto files (Go, Python, Java)
+./cryptoscan scan ./crypto-samples
+
+# Expected: ~35 findings across 3 files showing various crypto patterns
+# - Quantum vulnerable: RSA, ECDSA, Ed25519
+# - Broken/weak: MD5, SHA-1, DES, 3DES
+# - With source context and remediation guidance
+```
+
 <details>
 <summary><strong>Other installation methods</strong></summary>
 
