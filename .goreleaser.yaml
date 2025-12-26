@@ -108,7 +108,7 @@ brews:
       owner: csnp
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    skip_upload: auto
+    skip_upload: true
     directory: Formula
     homepage: https://qramm.org
     description: Cryptographic discovery tool for the post-quantum era
