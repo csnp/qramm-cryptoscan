@@ -51,6 +51,11 @@ CryptoScan is purpose-built for quantum readiness assessment:
 
 ## Quick Start
 
+### Prerequisites
+
+- **Go 1.21 or later** — [Download Go](https://go.dev/dl/)
+- **Git** — Required for scanning remote repositories
+
 ### Installation
 
 ```bash
@@ -314,20 +319,43 @@ SARIF output integrates with GitHub Code Scanning, VS Code SARIF Viewer, and oth
 
 #### CBOM (Cryptographic Bill of Materials)
 
-CBOM provides a compliance-ready inventory of all cryptographic assets:
+**What is CBOM?** Just as an SBOM (Software Bill of Materials) inventories your software dependencies, a CBOM inventories all cryptographic algorithms, keys, and certificates in your systems. It answers: "What cryptography are we using, where, and is it quantum-safe?"
+
+**Why it matters:**
+- **Compliance**: Required by emerging regulations (OMB M-23-02, NIST guidelines) for federal contractors and regulated industries
+- **Visibility**: Single source of truth for all cryptographic assets across your organization
+- **Migration Planning**: Identifies exactly what needs to change for post-quantum readiness
+- **Audit Trail**: Documented evidence of cryptographic posture for security assessments
 
 ```json
 {
   "bomFormat": "CryptoBOM",
   "specVersion": "1.0",
+  "serialNumber": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
+  "timestamp": "2025-01-15T10:30:00Z",
   "components": [
     {
-      "type": "crypto-algorithm",
+      "type": "algorithm",
       "name": "RSA-2048",
+      "category": "asymmetric",
       "quantumSafe": false,
-      "locations": [...]
+      "occurrences": 12,
+      "locations": ["src/auth/jwt.go:45", "src/tls/config.go:23"]
+    },
+    {
+      "type": "algorithm",
+      "name": "AES-256-GCM",
+      "category": "symmetric",
+      "quantumSafe": true,
+      "occurrences": 8,
+      "locations": ["src/crypto/encrypt.go:67"]
     }
-  ]
+  ],
+  "summary": {
+    "totalAlgorithms": 15,
+    "quantumVulnerable": 7,
+    "quantumSafe": 8
+  }
 }
 ```
 
