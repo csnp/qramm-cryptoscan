@@ -716,9 +716,9 @@ func (s *Scanner) shouldIncludeFinding(f types.Finding) bool {
 		}
 	}
 
-	// Skip findings in documentation strings within code files
-	// These are just descriptions, not actual crypto usage
-	if isDocumentationString(f.Context) {
+	// Skip findings in low-value contexts (logs, labels, error messages, docstrings)
+	// These mention algorithms but aren't actual cryptographic operations
+	if isLowValueContext(f.Context) {
 		return false
 	}
 
@@ -733,10 +733,77 @@ func (s *Scanner) shouldIncludeFinding(f types.Finding) bool {
 	return true
 }
 
-// isDocumentationString checks if a line appears to be documentation/description
-// rather than actual crypto usage
-func isDocumentationString(line string) bool {
+// isLowValueContext checks if a line contains algorithm mentions in contexts
+// that are not actual cryptographic operations (logs, labels, error messages, docstrings)
+func isLowValueContext(line string) bool {
 	lineLower := strings.ToLower(line)
+
+	// Log/print statements - algorithm mentioned in output, not usage
+	logPatterns := []string{
+		"fmt.print", "fmt.sprint", "fmt.fprint",
+		"log.", "logger.", "logging.",
+		"console.log", "console.error", "console.warn",
+		"print(", "println(",
+		"debug(", "info(", "warn(", "error(",
+	}
+	for _, pattern := range logPatterns {
+		if strings.Contains(lineLower, pattern) {
+			return true
+		}
+	}
+
+	// String labels/metadata - algorithm name as a value, not usage
+	// e.g., "auth_method": "ed25519", c.Locals("authenticated_via", "ed25519")
+	labelPatterns := []string{
+		"auth_method",
+		"authenticated_via",
+		"authentication_type",
+		"signing_algorithm",
+		"encryption_algorithm",
+		"key_type",
+		"algorithm_name",
+		"crypto_type",
+		`"type":`,
+		`"method":`,
+	}
+	for _, pattern := range labelPatterns {
+		if strings.Contains(lineLower, pattern) {
+			return true
+		}
+	}
+
+	// Error message strings - validation messages mentioning algorithms
+	// e.g., "publicKey must be a valid Ed25519 public key"
+	errorPatterns := []string{
+		"must be a valid",
+		"invalid.*key",
+		"failed to",
+		"error:",
+		"expected.*got",
+		"cannot be empty",
+	}
+	for _, pattern := range errorPatterns {
+		if strings.Contains(lineLower, pattern) {
+			return true
+		}
+	}
+
+	// Docstrings - documentation inside code
+	// e.g., """Sign a message using Ed25519""", // Sign using Ed25519
+	docstringPatterns := []string{
+		`"""`,     // Python docstring
+		"'''",     // Python docstring
+		"sign a message using",
+		"verify a message using",
+		"encrypt using",
+		"decrypt using",
+		"generated.*key",
+	}
+	for _, pattern := range docstringPatterns {
+		if strings.Contains(lineLower, pattern) {
+			return true
+		}
+	}
 
 	// Common documentation patterns
 	docPatterns := []string{
@@ -763,7 +830,6 @@ func isDocumentationString(line string) bool {
 		"attestation",         // Security attestation descriptions
 		"capabilities",        // Capability descriptions
 	}
-
 	for _, pattern := range docPatterns {
 		if strings.Contains(lineLower, pattern) {
 			return true
