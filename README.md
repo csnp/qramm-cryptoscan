@@ -17,7 +17,7 @@
   <a href="#why-cryptoscan">Why CryptoScan</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#features">Features</a> •
-  <a href="#documentation">Documentation</a> •
+  <a href="https://qramm.org/learn/cryptoscan-guide.html">Full Documentation</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
@@ -188,6 +188,8 @@ cryptoscan scan . --format cbom --output crypto-bom.json
 ```
 
 ## Documentation
+
+> **Full Documentation**: For comprehensive guides, tutorials, and examples, visit **[qramm.org/learn/cryptoscan-guide](https://qramm.org/learn/cryptoscan-guide.html)**
 
 ### CLI Reference
 
