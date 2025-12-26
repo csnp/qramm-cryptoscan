@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://qramm.org/images/cryptoscan-logo.svg" alt="Crypto Scan" width="400">
+  <img src="assets/logos/logo.png" alt="CryptoScan" width="400">
 </p>
 
 <h3 align="center">Discover. Assess. Migrate.</h3>
@@ -231,7 +231,7 @@ Supported directives:
 
 ### v1.1
 - [ ] Git history scanning
-- [ ] Remote repository URLs
+- [x] Remote repository URLs
 
 ### v2.0
 - [ ] AWS scanning (KMS, ACM, Secrets Manager)
