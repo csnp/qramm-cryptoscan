@@ -17,19 +17,22 @@ import (
 )
 
 var (
-	outputFormat   string
-	outputFile     string
-	includeGlobs   string
-	excludeGlobs   string
-	maxDepth       int
-	showProgress   bool
-	minSeverity    string
-	noColor        bool
-	jsonPretty     bool
-	scanGitHistory bool
-	groupBy        string
-	contextLines   int
-	streamFindings bool
+	outputFormat       string
+	outputFile         string
+	includeGlobs       string
+	excludeGlobs       string
+	maxDepth           int
+	showProgress       bool
+	minSeverity        string
+	noColor            bool
+	jsonPretty         bool
+	scanGitHistory     bool
+	groupBy            string
+	contextLines       int
+	streamFindings     bool
+	includeImports     bool
+	includeQuantumSafe bool
+	verbose            bool
 )
 
 var scanCmd = &cobra.Command{
@@ -75,6 +78,9 @@ func init() {
 	scanCmd.Flags().StringVarP(&groupBy, "group-by", "g", "", "Group output by: file, severity, category, quantum")
 	scanCmd.Flags().IntVarP(&contextLines, "context", "c", 3, "Number of context lines to show around findings")
 	scanCmd.Flags().BoolVar(&streamFindings, "stream", true, "Show findings as they are discovered")
+	scanCmd.Flags().BoolVar(&includeImports, "include-imports", false, "Include library import findings (normally suppressed as low-value)")
+	scanCmd.Flags().BoolVar(&includeQuantumSafe, "include-quantum-safe", false, "Include quantum-safe algorithm findings (SHA-256, AES-256)")
+	scanCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show all findings including imports and quantum-safe algorithms")
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
@@ -108,13 +114,15 @@ func runScan(cmd *cobra.Command, args []string) error {
 
 	// Create scanner config
 	cfg := scanner.Config{
-		Target:         target,
-		IncludeGlobs:   includes,
-		ExcludeGlobs:   excludes,
-		MaxDepth:       maxDepth,
-		ShowProgress:   showProgress,
-		ScanGitHistory: scanGitHistory,
-		MinSeverity:    parseSeverity(minSeverity),
+		Target:             target,
+		IncludeGlobs:       includes,
+		ExcludeGlobs:       excludes,
+		MaxDepth:           maxDepth,
+		ShowProgress:       showProgress,
+		ScanGitHistory:     scanGitHistory,
+		MinSeverity:        parseSeverity(minSeverity),
+		IncludeImports:     includeImports || verbose,     // Include if explicitly set or verbose mode
+		IncludeQuantumSafe: includeQuantumSafe || verbose, // Include if explicitly set or verbose mode
 	}
 
 	// Setup streaming output for text format (thread-safe for parallel scanning)

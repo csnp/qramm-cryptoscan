@@ -54,6 +54,8 @@ type Config struct {
 	MinSeverity      Severity
 	MinConfidence    Confidence
 	IncludeDocs      bool               // Whether to include documentation files
+	IncludeImports   bool               // Whether to include library import findings (low-value, default false)
+	IncludeQuantumSafe bool             // Whether to include quantum-safe findings like SHA-256, AES-256 (default false)
 	OnFinding        func(Finding)      // Callback when a finding is discovered (for streaming output)
 	OnFileScanned    func(path string)  // Callback when a file is scanned (for progress)
 }
@@ -173,6 +175,9 @@ func (s *Scanner) Scan() (*Results, error) {
 		return nil, err
 	}
 
+	// Deduplicate findings (same file+line+category = keep highest priority)
+	s.findings = s.deduplicateFindings(s.findings)
+
 	// Sort findings by priority
 	sort.Slice(s.findings, func(i, j int) bool {
 		return s.findings[i].Priority() > s.findings[j].Priority()
@@ -278,15 +283,49 @@ func (s *Scanner) scanDirectory(root string) error {
 
 func (s *Scanner) shouldSkipDir(root, path, name string) error {
 	relPath, _ := filepath.Rel(root, path)
+	pathLower := strings.ToLower(path)
 
-	// Always skip these
+	// Always skip these directory names
 	skipDirs := map[string]bool{
+		// Version control
 		".git": true, ".svn": true, ".hg": true,
+		// Dependencies
 		"node_modules": true, "__pycache__": true,
+		// IDE
 		".idea": true, ".vscode": true,
+		// Build outputs (these contain compiled/bundled code with false positives)
+		".next": true, "dist": true, "build": true, "out": true,
+		".output": true, ".nuxt": true, ".cache": true,
+		// Coverage and test artifacts
+		"coverage": true, ".nyc_output": true,
+		// Compiled binaries
+		"bin": true,
+		// Example/demo directories (often contain non-production code)
+		"examples": true, "example": true, "samples": true, "sample": true,
+		"demo": true, "demos": true, "mock": true, "mocks": true,
+		"fixtures": true, "testdata": true, "test-fixtures": true,
+		// Terraform/infrastructure state
+		".terraform": true,
 	}
 	if skipDirs[name] {
 		return filepath.SkipDir
+	}
+
+	// Also check if ANY path component is a skip directory
+	// This catches nested cases like .next/standalone/.next/ or sdk/typescript/dist/
+	skipPathPatterns := []string{
+		"/.next/", "/dist/", "/build/", "/out/", "/.output/",
+		"/.nuxt/", "/.cache/", "/node_modules/", "/__pycache__/",
+		"/coverage/", "/.nyc_output/", "/bin/",
+		"/standalone/",    // Next.js standalone builds
+		"/target/apidocs", // Java generated API docs
+		"/target/site/",   // Maven site docs
+		"/.egg-info/",     // Python build artifacts
+	}
+	for _, pattern := range skipPathPatterns {
+		if strings.Contains(pathLower, pattern) {
+			return filepath.SkipDir
+		}
 	}
 
 	for _, pattern := range s.config.ExcludeGlobs {
@@ -303,6 +342,7 @@ func (s *Scanner) shouldSkipDir(root, path, name string) error {
 
 func (s *Scanner) shouldScanFile(path string) bool {
 	name := filepath.Base(path)
+	nameLower := strings.ToLower(name)
 	ext := filepath.Ext(path)
 
 	// Skip binary files by extension
@@ -317,13 +357,56 @@ func (s *Scanner) shouldScanFile(path string) bool {
 		// Office formats (ZIP archives containing XML - scanning raw causes false positives)
 		".xlsx": true, ".xls": true, ".docx": true, ".doc": true,
 		".pptx": true, ".ppt": true, ".odt": true, ".ods": true, ".odp": true,
+		// Source maps (generated, not real source)
+		".map": true,
 	}
 	if binaryExts[ext] {
 		return false
 	}
 
+	// Skip source map files (e.g., foo.js.map, foo.css.map)
+	if strings.HasSuffix(nameLower, ".js.map") || strings.HasSuffix(nameLower, ".css.map") {
+		return false
+	}
+
+	// Skip minified files (contain bundled code with coincidental matches)
+	if strings.HasSuffix(nameLower, ".min.js") || strings.HasSuffix(nameLower, ".min.css") ||
+		strings.HasSuffix(nameLower, "-min.js") || strings.HasSuffix(nameLower, "-min.css") {
+		return false
+	}
+
+	// Skip lock files (contain package metadata with algorithm names, not actionable)
+	lockFiles := map[string]bool{
+		"package-lock.json": true, "yarn.lock": true, "pnpm-lock.yaml": true,
+		"poetry.lock": true, "pipfile.lock": true, "composer.lock": true,
+		"gemfile.lock": true, "cargo.lock": true, "pubspec.lock": true,
+		"packages.lock.json": true, "paket.lock": true,
+	}
+	if lockFiles[nameLower] {
+		return false
+	}
+
+	// Skip backup and disabled test files
+	if strings.HasSuffix(nameLower, ".bak") || strings.HasSuffix(nameLower, ".disabled") ||
+		strings.HasSuffix(nameLower, ".orig") || strings.HasSuffix(nameLower, ".old") {
+		return false
+	}
+
+	// Skip package metadata files (contain descriptions mentioning algorithms)
+	metadataFiles := map[string]bool{
+		"pkg-info": true, "metadata": true,
+	}
+	if metadataFiles[nameLower] {
+		return false
+	}
+
 	// Skip compiled binaries without extensions (ELF, Mach-O, PE)
 	if ext == "" && isBinaryFile(path) {
+		return false
+	}
+
+	// Also check files that may be binaries with odd extensions
+	if isBinaryFile(path) {
 		return false
 	}
 
@@ -398,6 +481,11 @@ func (s *Scanner) scanFile(path string) error {
 		return nil
 	}
 
+	// Skip minified files (detected by average line length)
+	if isMinifiedFile(allLines) {
+		return nil
+	}
+
 	var prevLines []string
 
 	for lineNum, line := range allLines {
@@ -409,6 +497,12 @@ func (s *Scanner) scanFile(path string) error {
 
 		// Check for ignore comment on this line or previous line
 		if s.hasIgnoreComment(line, allLines, lineNum) {
+			continue
+		}
+
+		// Skip extremely long lines (minified/bundled code)
+		// These produce false positives from coincidental string matches
+		if len(line) > 1000 {
 			continue
 		}
 
@@ -431,6 +525,11 @@ func (s *Scanner) scanFile(path string) error {
 		for _, m := range matches {
 			// Apply confidence filter
 			if !s.meetsConfidenceThreshold(m.Confidence) {
+				continue
+			}
+
+			// Apply noise reduction filters
+			if !s.shouldIncludeFinding(m) {
 				continue
 			}
 
@@ -595,6 +694,85 @@ func (s *Scanner) meetsConfidenceThreshold(conf types.Confidence) bool {
 	}
 }
 
+// shouldIncludeFinding applies noise reduction filters
+// Returns false if the finding should be suppressed based on config
+func (s *Scanner) shouldIncludeFinding(f types.Finding) bool {
+	// Skip library import findings unless explicitly included
+	// These are low-value (just import statements, not actual crypto usage)
+	if !s.config.IncludeImports && f.Category == "Library Import" {
+		return false
+	}
+
+	// Skip quantum-safe/acceptable algorithms unless explicitly included
+	// SHA-256, SHA-384, SHA-512, AES-256 are acceptable and create noise
+	if !s.config.IncludeQuantumSafe {
+		// Skip SHA-2 family (quantum partial, acceptable)
+		if f.Algorithm == "SHA-2" && f.Quantum == types.QuantumPartial {
+			return false
+		}
+		// Skip AES (quantum partial, acceptable especially AES-256)
+		if f.Algorithm == "AES" && f.Quantum == types.QuantumPartial && f.Severity <= types.SeverityInfo {
+			return false
+		}
+	}
+
+	// Skip findings in documentation strings within code files
+	// These are just descriptions, not actual crypto usage
+	if isDocumentationString(f.Context) {
+		return false
+	}
+
+	// Skip findings in files whose names indicate API docs or documentation
+	fileLower := strings.ToLower(f.File)
+	if strings.Contains(fileLower, "-documentation") || strings.Contains(fileLower, "-docs") ||
+		strings.Contains(fileLower, "_documentation") || strings.Contains(fileLower, "_docs") ||
+		strings.Contains(fileLower, "/docs/") || strings.Contains(fileLower, "/documentation/") {
+		return false
+	}
+
+	return true
+}
+
+// isDocumentationString checks if a line appears to be documentation/description
+// rather than actual crypto usage
+func isDocumentationString(line string) bool {
+	lineLower := strings.ToLower(line)
+
+	// Common documentation patterns
+	docPatterns := []string{
+		"description:",
+		"description\":",
+		"summary:",
+		"summary\":",
+		" - ",           // Markdown list item
+		"* ",            // Markdown list item
+		"fingerprint",   // UI label like "Public Key Fingerprint (SHA-256)"
+		"hashed before", // API doc like "SHA-256 hashed before storage"
+		"uses sha",      // Description like "Uses SHA-256 for..."
+		"uses aes",
+		"encrypted with",
+		"algorithm:",
+		// API documentation object patterns
+		"auth:",               // API auth method description
+		"auth\":",             // JSON style
+		"authentication:",     // Auth description
+		"verification using",  // API doc like "verification using Ed25519"
+		"signing using",       // API doc about signing
+		"cryptographic",       // Description of cryptographic features
+		"zero-effort",         // Feature description
+		"attestation",         // Security attestation descriptions
+		"capabilities",        // Capability descriptions
+	}
+
+	for _, pattern := range docPatterns {
+		if strings.Contains(lineLower, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (s *Scanner) calculateSummary() Summary {
 	summary := Summary{
 		TotalFindings: len(s.findings),
@@ -736,6 +914,71 @@ func isGitURL(s string) bool {
 	return strings.HasPrefix(s, "http://") ||
 		strings.HasPrefix(s, "https://") ||
 		strings.HasPrefix(s, "git@")
+}
+
+// deduplicateFindings removes near-duplicate findings
+// Keeps the highest priority finding for each file+line+category combination
+func (s *Scanner) deduplicateFindings(findings []Finding) []Finding {
+	if len(findings) == 0 {
+		return findings
+	}
+
+	// Key: file:line:category -> best finding
+	seen := make(map[string]Finding)
+
+	for _, f := range findings {
+		// Create a key for grouping similar findings
+		key := fmt.Sprintf("%s:%d:%s", f.File, f.Line, f.Category)
+
+		existing, exists := seen[key]
+		if !exists {
+			seen[key] = f
+		} else {
+			// Keep the higher priority finding
+			if f.Priority() > existing.Priority() {
+				seen[key] = f
+			}
+		}
+	}
+
+	// Convert map back to slice
+	deduped := make([]Finding, 0, len(seen))
+	for _, f := range seen {
+		deduped = append(deduped, f)
+	}
+
+	return deduped
+}
+
+// isMinifiedFile detects minified code by checking line characteristics
+func isMinifiedFile(lines []string) bool {
+	if len(lines) == 0 {
+		return false
+	}
+
+	// Calculate average line length
+	totalLen := 0
+	longLines := 0
+	for _, line := range lines {
+		totalLen += len(line)
+		if len(line) > 500 {
+			longLines++
+		}
+	}
+
+	avgLen := totalLen / len(lines)
+
+	// Minified files typically have:
+	// - Very high average line length (>200 chars)
+	// - Or mostly very long lines (>50% lines over 500 chars)
+	if avgLen > 200 {
+		return true
+	}
+	if len(lines) > 0 && float64(longLines)/float64(len(lines)) > 0.5 {
+		return true
+	}
+
+	return false
 }
 
 // isBinaryFile checks if a file is a compiled binary by reading magic bytes

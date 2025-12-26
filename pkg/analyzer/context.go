@@ -83,6 +83,158 @@ func isStringContext(line string) bool {
 	return false
 }
 
+// IsHelpText detects if a line looks like help/usage text or documentation
+// These often mention algorithms but aren't actual crypto usage
+func IsHelpText(line string) bool {
+	lineLower := strings.ToLower(line)
+
+	// CLI help/usage patterns
+	helpPatterns := []string{
+		"usage:", "options:", "flags:", "arguments:", "commands:",
+		"--help", "-help", "help:", "synopsis:",
+		"description:", "default:", "example:",
+		"supported algorithms", "available algorithms", "algorithm:",
+		"choose from:", "one of:", "valid values:",
+		"allowed:", "accepts:", "supported:",
+	}
+	for _, p := range helpPatterns {
+		if strings.Contains(lineLower, p) {
+			return true
+		}
+	}
+
+	// API documentation / help text patterns
+	apiDocPatterns := []string{
+		"returns:", "parameters:", "response:", "request:",
+		"enum:", "type:", "format:", "schema:",
+		"api reference", "documentation", "specification",
+	}
+	for _, p := range apiDocPatterns {
+		if strings.Contains(lineLower, p) {
+			return true
+		}
+	}
+
+	// Common help text structures (algorithm lists in docs)
+	// e.g., "Supported: RSA, ECDSA, Ed25519"
+	if strings.Contains(line, ": ") && (strings.Contains(lineLower, "supported") ||
+		strings.Contains(lineLower, "available") ||
+		strings.Contains(lineLower, "allowed")) {
+		return true
+	}
+
+	return false
+}
+
+// IsURLOrPath detects if the match appears to be in a URL or file path context
+func IsURLOrPath(line, match string) bool {
+	matchLower := strings.ToLower(match)
+	lineLower := strings.ToLower(line)
+
+	// Find position of match in line
+	pos := strings.Index(lineLower, matchLower)
+	if pos == -1 {
+		return false
+	}
+
+	// Check if match is part of a URL
+	urlPrefixes := []string{"http://", "https://", "ftp://", "file://", "s3://", "gs://"}
+	for _, prefix := range urlPrefixes {
+		prefixPos := strings.LastIndex(lineLower[:pos+1], prefix)
+		if prefixPos != -1 && prefixPos < pos {
+			// Check if there's no space between URL prefix and match
+			segment := lineLower[prefixPos:pos]
+			if !strings.Contains(segment, " ") && !strings.Contains(segment, "\t") {
+				return true
+			}
+		}
+	}
+
+	// Check if match is part of a file path
+	// Look for path separators before/after the match
+	beforeMatch := ""
+	if pos > 0 {
+		beforeMatch = line[max(0, pos-20):pos]
+	}
+	afterMatch := ""
+	if pos+len(match) < len(line) {
+		afterMatch = line[pos+len(match):min(len(line), pos+len(match)+20)]
+	}
+
+	// Path indicators - must have actual path separator
+	if strings.Contains(beforeMatch, "/") || strings.Contains(beforeMatch, "\\") ||
+		strings.HasPrefix(afterMatch, "/") || strings.HasPrefix(afterMatch, "\\") {
+		return true
+	}
+
+	// Check for file extension pattern (e.g., "rsa.pem", "ecdsa.key")
+	// But NOT method calls (e.g., "rsa.GenerateKey")
+	if strings.HasPrefix(afterMatch, ".") && len(afterMatch) > 1 {
+		// Extract the extension/method name
+		extEnd := strings.IndexAny(afterMatch[1:], " \t\n(){}[]<>,;:\"'")
+		if extEnd == -1 {
+			extEnd = len(afterMatch)
+		} else {
+			extEnd++ // account for starting at index 1
+		}
+		if extEnd > 1 { // Ensure we have something to extract
+			ext := strings.ToLower(afterMatch[1:extEnd])
+			// File extensions that indicate a path
+			fileExts := map[string]bool{
+				"pem": true, "key": true, "crt": true, "cer": true, "der": true,
+				"p12": true, "pfx": true, "jks": true, "pub": true, "sig": true,
+				"txt": true, "json": true, "yaml": true, "yml": true, "xml": true,
+			}
+			if fileExts[ext] {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// IsVariableOrFunctionName detects if the match is part of an identifier name
+// e.g., rsaKeySize, getRSAKey, showECDSAInfo - these are less actionable
+func IsVariableOrFunctionName(line, match string) bool {
+	matchLower := strings.ToLower(match)
+	lineLower := strings.ToLower(line)
+
+	pos := strings.Index(lineLower, matchLower)
+	if pos == -1 {
+		return false
+	}
+
+	// Check character before match (if exists)
+	if pos > 0 {
+		charBefore := line[pos-1]
+		// If preceded by a letter, it's part of an identifier
+		if (charBefore >= 'a' && charBefore <= 'z') || (charBefore >= 'A' && charBefore <= 'Z') {
+			return true
+		}
+	}
+
+	// Check character after match (if exists)
+	endPos := pos + len(match)
+	if endPos < len(line) {
+		charAfter := line[endPos]
+		// If followed by a letter (not just typical suffixes), might be identifier
+		if (charAfter >= 'a' && charAfter <= 'z') || (charAfter >= 'A' && charAfter <= 'Z') {
+			// Exception: common crypto suffixes that indicate actual usage
+			afterStr := strings.ToLower(line[endPos:min(len(line), endPos+10)])
+			validSuffixes := []string{"key", "cert", "sign", "encrypt", "decrypt", "hash"}
+			for _, suffix := range validSuffixes {
+				if strings.HasPrefix(afterStr, suffix) {
+					return false // This is likely real crypto usage
+				}
+			}
+			return true
+		}
+	}
+
+	return false
+}
+
 func isImportLine(line string, lang Language) bool {
 	switch lang {
 	case LangPython:

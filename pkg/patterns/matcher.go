@@ -125,6 +125,25 @@ func (m *Matcher) MatchWithContext(line, file string, lineNum int, fileCtx *anal
 				}
 			}
 
+			// Check for help text / documentation context (high false positive rate)
+			if analyzer.IsHelpText(line) {
+				finding.Confidence = types.ConfidenceLow
+				finding.Severity = adjustSeverityDown(finding.Severity, 2)
+			}
+
+			// Check if match is in a URL or file path (not actionable)
+			if analyzer.IsURLOrPath(line, finding.Match) {
+				finding.Confidence = types.ConfidenceLow
+				finding.Severity = adjustSeverityDown(finding.Severity, 2)
+			}
+
+			// Check if match is part of a variable/function name (less actionable)
+			if analyzer.IsVariableOrFunctionName(line, finding.Match) {
+				if finding.Confidence == types.ConfidenceHigh {
+					finding.Confidence = types.ConfidenceMedium
+				}
+			}
+
 			if lineCtx != nil {
 				finding.Purpose = lineCtx.Purpose
 				// Override confidence from line context if not already set
@@ -288,11 +307,12 @@ func (m *Matcher) loadPatterns() {
 	})
 
 	// DSA Detection
+	// Note: Require key size suffix or crypto context to avoid false positives
 	m.patterns = append(m.patterns, Pattern{
 		ID:          "DSA-001",
 		Name:        "DSA Algorithm",
 		Category:    "Asymmetric Encryption",
-		Regex:       regexp.MustCompile(`(?i)\bDSA[-_]?(1024|2048|3072)?\b`),
+		Regex:       regexp.MustCompile(`(?i)\bDSA[-_](1024|2048|3072)\b|KeyPairGenerator\.getInstance\s*\(\s*["']DSA["']|ssh-dss\b|-----BEGIN\s+DSA|"crypto/dsa"`),
 		Severity:    types.SeverityHigh,
 		Quantum:     types.QuantumVulnerable,
 		Algorithm:   "DSA",
@@ -348,11 +368,12 @@ func (m *Matcher) loadPatterns() {
 	})
 
 	// DES/3DES (Deprecated)
+	// Note: Require mode suffix (CBC/ECB/CFB/OFB) or crypto context to avoid false positives
 	m.patterns = append(m.patterns, Pattern{
 		ID:          "DES-001",
 		Name:        "DES Algorithm",
 		Category:    "Deprecated Algorithm",
-		Regex:       regexp.MustCompile(`(?i)\bDES[-_]?(CBC|ECB|CFB|OFB)?\b`),
+		Regex:       regexp.MustCompile(`(?i)\bDES[-_](CBC|ECB|CFB|OFB)\b|\bDESede\b|Cipher\.getInstance\s*\(\s*["']DES["']|createCipher\s*\(\s*["']des|crypto\.createCipher.*["']des|\bDES\.(new|encrypt|decrypt)\b|\bDES\.MODE_`),
 		Severity:    types.SeverityCritical,
 		Quantum:     types.QuantumVulnerable,
 		Algorithm:   "DES",
@@ -482,11 +503,13 @@ func (m *Matcher) loadPatterns() {
 	})
 
 	// Weak Cipher Suites
+	// Note: Removed bare EXP[-_] and EXPORT[-_] as they cause false positives with JS export statements
+	// Only match these in proper cipher suite context (TLS_/SSL_ prefix)
 	m.patterns = append(m.patterns, Pattern{
 		ID:          "CIPHER-001",
 		Name:        "Weak Cipher Suite",
 		Category:    "Weak Cipher",
-		Regex:       regexp.MustCompile(`(?i)\b(EXP[-_]|EXPORT[-_]|TLS_.*EXPORT|SSL_.*EXPORT|NULL[-_]?(SHA|MD5)|DES[-_]CBC[-_]?(SHA|MD5)?|anon[-_]?DH|ADH[-_]|AECDH[-_])\b|CIPHER.*NULL`),
+		Regex:       regexp.MustCompile(`(?i)\b(TLS_[A-Z0-9_]*EXPORT[A-Z0-9_]*|SSL_[A-Z0-9_]*EXPORT[A-Z0-9_]*|TLS_NULL[A-Z0-9_]*|SSL_NULL[A-Z0-9_]*|TLS_[A-Z0-9_]*_anon_|SSL_[A-Z0-9_]*_anon_|TLS_RSA_WITH_NULL|ADH[-_][A-Z0-9]+|AECDH[-_][A-Z0-9]+)\b|(?i)\bCIPHER\s*[:=].*NULL`),
 		Severity:    types.SeverityCritical,
 		Quantum:     types.QuantumVulnerable,
 		Description: "Weak or export-grade cipher suite detected. These provide inadequate security.",
