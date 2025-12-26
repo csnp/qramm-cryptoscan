@@ -39,3 +39,9 @@ build/
 .env
 .env.local
 config.local.yaml
+
+# AI assistant files
+CLAUDE.md
+.cursorrules
+.aider*
+.copilot/

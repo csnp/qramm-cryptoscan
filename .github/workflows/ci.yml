@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
   pull_request:
     branches: [main]
 
@@ -49,6 +51,32 @@ jobs:
   release:
     needs: [test, lint]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Build binaries on main branch pushes (without releasing)
+  build:
+    needs: [test, lint]
+    runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
@@ -60,19 +88,12 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build binaries
-        run: |
-          mkdir -p dist
-          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
-          COMMIT=$(git rev-parse --short HEAD)
-          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          LDFLAGS="-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}"
-
-          GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/cryptoscan-darwin-amd64 ./cmd/cryptoscan
-          GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/cryptoscan-darwin-arm64 ./cmd/cryptoscan
-          GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/cryptoscan-linux-amd64 ./cmd/cryptoscan
-          GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/cryptoscan-linux-arm64 ./cmd/cryptoscan
-          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/cryptoscan-windows-amd64.exe ./cmd/cryptoscan
+      - name: Build snapshot
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: build --snapshot --clean
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -1,0 +1,135 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# GoReleaser configuration for CryptoScan
+# Documentation: https://goreleaser.com
+
+version: 2
+
+project_name: cryptoscan
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: cryptoscan
+    main: ./cmd/cryptoscan
+    binary: cryptoscan
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Security
+      regexp: '^.*?sec(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: csnp
+    name: qramm-cryptoscan
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## CryptoScan {{ .Tag }}
+
+    **Cryptographic discovery tool for the post-quantum era**
+
+    Part of the [QRAMM Toolkit](https://qramm.org) by [CSNP](https://csnp.org)
+  footer: |
+    ---
+
+    ### Quick Install
+
+    ```bash
+    # Using Go
+    go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@{{ .Tag }}
+
+    # Or download binary from assets below
+    ```
+
+    ### Checksums
+
+    Verify your download with the checksums.txt file.
+
+brews:
+  - name: cryptoscan
+    repository:
+      owner: csnp
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    skip_upload: auto
+    directory: Formula
+    homepage: https://qramm.org
+    description: Cryptographic discovery tool for the post-quantum era
+    license: Apache-2.0
+    install: |
+      bin.install "cryptoscan"
+    test: |
+      system "#{bin}/cryptoscan", "--version"
+
+nfpms:
+  - id: packages
+    package_name: cryptoscan
+    vendor: CSNP
+    homepage: https://qramm.org
+    maintainer: CSNP <info@csnp.org>
+    description: Cryptographic discovery tool for the post-quantum era
+    license: Apache-2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+
+announce:
+  skip: "true"
