@@ -89,7 +89,7 @@ git clone https://github.com/csnp/qramm-cryptoscan.git
 cd qramm-cryptoscan
 go build -o cryptoscan ./cmd/cryptoscan
 sudo mv cryptoscan /usr/local/bin/
-cd .. && rm -rf qramm-cryptoscan
+cd .. 
 cryptoscan --version
 ```
 
