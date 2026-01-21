@@ -89,8 +89,8 @@ git clone https://github.com/csnp/qramm-cryptoscan.git
 cd qramm-cryptoscan
 go build -o cryptoscan ./cmd/cryptoscan
 sudo mv cryptoscan /usr/local/bin/
-cd .. 
-cryptoscan --version
+cd ..
+cryptoscan version
 ```
 
 #### Option 2: Go Install
