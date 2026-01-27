@@ -26,6 +26,9 @@ type Severity = types.Severity
 type QuantumRisk = types.QuantumRisk
 type Confidence = types.Confidence
 type Finding = types.Finding
+type MigrationScore = types.MigrationScore
+type QRAMMReadiness = types.QRAMMReadiness
+type FileRiskScore = types.FileRiskScore
 
 const (
 	SeverityInfo     = types.SeverityInfo
@@ -62,17 +65,18 @@ type Config struct {
 
 // Results contains all scan results
 type Results struct {
-	Findings       []Finding            `json:"findings"`
-	Summary        Summary              `json:"summary"`
-	Insights       []Insight            `json:"insights"`
-	ScanTarget     string               `json:"scanTarget"`
-	ScanTime       time.Time            `json:"scanTime"`
-	ScanDuration   time.Duration        `json:"scanDuration"`
-	FilesScanned   int                  `json:"filesScanned"`
-	LinesScanned   int                  `json:"linesScanned"`
-	BytesScanned   int64                `json:"bytesScanned"`
-	LanguageStats  map[string]int       `json:"languageStats"`
-	Metadata       map[string]string    `json:"metadata,omitempty"`
+	Findings       []Finding              `json:"findings"`
+	Summary        Summary                `json:"summary"`
+	MigrationScore *types.MigrationScore  `json:"migrationScore,omitempty"`
+	Insights       []Insight              `json:"insights"`
+	ScanTarget     string                 `json:"scanTarget"`
+	ScanTime       time.Time              `json:"scanTime"`
+	ScanDuration   time.Duration          `json:"scanDuration"`
+	FilesScanned   int                    `json:"filesScanned"`
+	LinesScanned   int                    `json:"linesScanned"`
+	BytesScanned   int64                  `json:"bytesScanned"`
+	LanguageStats  map[string]int         `json:"languageStats"`
+	Metadata       map[string]string      `json:"metadata,omitempty"`
 }
 
 // Insight provides actionable intelligence derived from findings
@@ -183,14 +187,18 @@ func (s *Scanner) Scan() (*Results, error) {
 		return s.findings[i].Priority() > s.findings[j].Priority()
 	})
 
+	// Calculate migration score and enhance findings with QRAMM mapping
+	migrationScore := analyzer.CalculateMigrationScore(s.findings)
+
 	// Build results
 	results := &Results{
-		Findings:      s.findings,
-		FilesScanned:  s.stats.filesScanned,
-		LinesScanned:  s.stats.linesScanned,
-		BytesScanned:  s.stats.bytesScanned,
-		LanguageStats: s.stats.languageStats,
-		Metadata:      make(map[string]string),
+		Findings:       s.findings,
+		MigrationScore: migrationScore,
+		FilesScanned:   s.stats.filesScanned,
+		LinesScanned:   s.stats.linesScanned,
+		BytesScanned:   s.stats.bytesScanned,
+		LanguageStats:  s.stats.languageStats,
+		Metadata:       make(map[string]string),
 	}
 
 	results.Summary = s.calculateSummary()

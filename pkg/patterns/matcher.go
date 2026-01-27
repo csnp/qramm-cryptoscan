@@ -818,4 +818,497 @@ func (m *Matcher) loadPatterns() {
 		References:  []string{"https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html"},
 		Tags:        []string{"key-derivation", "password", "weak"},
 	})
+
+	// ============================================
+	// POST-QUANTUM CRYPTOGRAPHY (Quantum Safe)
+	// ============================================
+
+	// ML-KEM (FIPS 203) - formerly Kyber
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "PQC-MLKEM-001",
+		Name:        "ML-KEM Key Encapsulation",
+		Category:    "Post-Quantum Cryptography",
+		Regex:       regexp.MustCompile(`(?i)\b(ML[-_]?KEM[-_]?(512|768|1024)?|MLKEM(512|768|1024)?|Kyber[-_]?(512|768|1024)?|CRYSTALS[-_]?Kyber|mlkem|kem\.ML[-_]?KEM|oqs\.KeyEncapsulation.*ML[-_]?KEM|liboqs.*kyber)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "ML-KEM",
+		Description: "ML-KEM (FIPS 203) post-quantum key encapsulation detected. This is quantum-safe.",
+		Remediation: "ML-KEM is NIST-approved and quantum-safe. Recommended for key exchange.",
+		References:  []string{"https://csrc.nist.gov/pubs/fips/203/final"},
+		Tags:        []string{"pqc", "quantum-safe", "kem", "fips-203"},
+	})
+
+	// ML-DSA (FIPS 204) - formerly Dilithium
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "PQC-MLDSA-001",
+		Name:        "ML-DSA Digital Signature",
+		Category:    "Post-Quantum Cryptography",
+		Regex:       regexp.MustCompile(`(?i)\b(ML[-_]?DSA[-_]?(44|65|87)?|MLDSA(44|65|87)?|Dilithium[-_]?(2|3|5)?|CRYSTALS[-_]?Dilithium|mldsa|sign\.ML[-_]?DSA|oqs\.Signature.*ML[-_]?DSA|oqs\.Signature.*Dilithium|liboqs.*dilithium)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "ML-DSA",
+		Description: "ML-DSA (FIPS 204) post-quantum digital signature detected. This is quantum-safe.",
+		Remediation: "ML-DSA is NIST-approved and quantum-safe. Recommended for digital signatures.",
+		References:  []string{"https://csrc.nist.gov/pubs/fips/204/final"},
+		Tags:        []string{"pqc", "quantum-safe", "signature", "fips-204"},
+	})
+
+	// SLH-DSA (FIPS 205) - formerly SPHINCS+
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "PQC-SLHDSA-001",
+		Name:        "SLH-DSA Hash-Based Signature",
+		Category:    "Post-Quantum Cryptography",
+		Regex:       regexp.MustCompile(`(?i)\b(SLH[-_]?DSA[-_]?(128|192|256)?(f|s)?|SLHDSA|SPHINCS\+?[-_]?(128|192|256)?(f|s)?|sphincsplus|oqs\.Signature.*SPHINCS|oqs\.Signature.*SLH[-_]?DSA)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "SLH-DSA",
+		Description: "SLH-DSA (FIPS 205) stateless hash-based signature detected. This is quantum-safe.",
+		Remediation: "SLH-DSA is NIST-approved and quantum-safe. Good backup option for ML-DSA.",
+		References:  []string{"https://csrc.nist.gov/pubs/fips/205/final"},
+		Tags:        []string{"pqc", "quantum-safe", "signature", "hash-based", "fips-205"},
+	})
+
+	// FN-DSA (FIPS 206 draft) - formerly Falcon
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "PQC-FNDSA-001",
+		Name:        "FN-DSA Digital Signature",
+		Category:    "Post-Quantum Cryptography",
+		Regex:       regexp.MustCompile(`(?i)\b(FN[-_]?DSA[-_]?(512|1024)?|FNDSA|Falcon[-_]?(512|1024)?|oqs\.Signature.*Falcon|pqcrypto.*falcon)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "FN-DSA",
+		Description: "FN-DSA (Falcon) post-quantum signature detected. Expected in FIPS 206.",
+		Remediation: "FN-DSA is quantum-safe. FIPS 206 standardization expected in 2025.",
+		References:  []string{"https://csrc.nist.gov/projects/post-quantum-cryptography"},
+		Tags:        []string{"pqc", "quantum-safe", "signature", "draft"},
+	})
+
+	// XMSS (SP 800-208) - Stateful hash-based signatures
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "PQC-XMSS-001",
+		Name:        "XMSS Stateful Signature",
+		Category:    "Post-Quantum Cryptography",
+		Regex:       regexp.MustCompile(`(?i)\b(XMSS([-_]?(MT|SHA2|SHAKE))?[-_]?(10|16|20)?|xmss_sign|xmss_keypair|XMSS\^MT)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "XMSS",
+		Description: "XMSS stateful hash-based signature detected (SP 800-208). Quantum-safe but requires careful state management.",
+		Remediation: "XMSS is NIST-approved (SP 800-208). Ensure proper state management to prevent key reuse.",
+		References:  []string{"https://csrc.nist.gov/pubs/sp/800/208/final", "https://datatracker.ietf.org/doc/html/rfc8391"},
+		Tags:        []string{"pqc", "quantum-safe", "signature", "stateful", "sp800-208"},
+	})
+
+	// LMS/HSS (SP 800-208) - Stateful hash-based signatures
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "PQC-LMS-001",
+		Name:        "LMS/HSS Stateful Signature",
+		Category:    "Post-Quantum Cryptography",
+		Regex:       regexp.MustCompile(`(?i)\b(LMS[-_]?(SHA256)?[-_]?(H5|H10|H15|H20|H25)?|HSS[-_]?LMS|lms_sign|lms_keypair|Leighton[-_]?Micali)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "LMS",
+		Description: "LMS/HSS stateful hash-based signature detected (SP 800-208). Quantum-safe but requires careful state management.",
+		Remediation: "LMS is NIST-approved (SP 800-208). Ensure proper state management to prevent key reuse.",
+		References:  []string{"https://csrc.nist.gov/pubs/sp/800/208/final", "https://datatracker.ietf.org/doc/html/rfc8554"},
+		Tags:        []string{"pqc", "quantum-safe", "signature", "stateful", "sp800-208"},
+	})
+
+	// PQC Library Imports
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "PQC-LIB-001",
+		Name:        "Post-Quantum Crypto Library",
+		Category:    "PQC Library Import",
+		Regex:       regexp.MustCompile(`(?i)(liboqs[-_]?(python|go|java)?|oqs\.(KeyEncapsulation|Signature)|circl/(kem|sign)/(mlkem|mldsa|kyber|dilithium)|pqcrypto[-_]?(mlkem|mldsa|kyber|dilithium|sphincs|falcon)|github\.com/cloudflare/circl|github\.com/open-quantum-safe|org\.bouncycastle\.pqc)`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Description: "Post-quantum cryptography library detected. Good practice for quantum-safe migration.",
+		Remediation: "Continue using PQC libraries. Ensure you're using NIST-approved algorithms (ML-KEM, ML-DSA, SLH-DSA).",
+		Tags:        []string{"pqc", "library", "quantum-safe"},
+	})
+
+	// Hybrid Key Exchange Detection
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "HYBRID-001",
+		Name:        "Hybrid Key Exchange",
+		Category:    "Hybrid Cryptography",
+		Regex:       regexp.MustCompile(`(?i)\b(X25519[-_]?MLKEM[-_]?768|P256[-_]?MLKEM[-_]?768|ECDH[-_]?MLKEM|RSA[-_]?MLKEM|hybrid[-_]?(kem|key[-_]?exchange)|X25519Kyber768|P256Kyber768|secp256r1[-_]?kyber|x25519[-_]?kyber)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "Hybrid-KEM",
+		Description: "Hybrid key exchange detected (classical + PQC). Excellent transition strategy.",
+		Remediation: "Hybrid cryptography is recommended during PQC transition. Provides security from both classical and quantum threats.",
+		References:  []string{"https://datatracker.ietf.org/doc/draft-ietf-tls-hybrid-design/"},
+		Tags:        []string{"hybrid", "quantum-safe", "transition", "best-practice"},
+	})
+
+	// Hybrid TLS Configuration
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "HYBRID-TLS-001",
+		Name:        "Hybrid TLS Configuration",
+		Category:    "Hybrid Cryptography",
+		Regex:       regexp.MustCompile(`(?i)(CurvePreferences.*X25519MLKEM|ssl_groups.*X25519MLKEM|NamedGroup::X25519MLKEM|TLS_.*_WITH_.*KYBER|kem[-_]?groups.*mlkem)`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "Hybrid-TLS",
+		Description: "Hybrid TLS key exchange configuration detected. Excellent quantum-safe practice.",
+		Remediation: "Continue using hybrid TLS configuration for quantum-safe key exchange.",
+		Tags:        []string{"hybrid", "tls", "quantum-safe", "configuration"},
+	})
+
+	// ============================================
+	// MESSAGE AUTHENTICATION CODES (MACs)
+	// ============================================
+
+	// HMAC-SHA256/384/512 (NIST Approved)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-HMAC-SHA2-001",
+		Name:        "HMAC-SHA2",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(HMAC[-_]?SHA[-_]?(256|384|512)|hmacSha(256|384|512)|HmacSHA(256|384|512)|HMAC\.SHA(256|384|512)|createHmac\s*\(\s*['"]sha(256|384|512)['"])\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "HMAC-SHA2",
+		Description: "HMAC with SHA-2 detected. NIST-approved (FIPS 198-1). Quantum-partial - security reduced by Grover's algorithm.",
+		Remediation: "HMAC-SHA256 is acceptable. For maximum quantum resistance, consider KMAC-256.",
+		References:  []string{"https://csrc.nist.gov/pubs/fips/198-1/final"},
+		Tags:        []string{"mac", "hmac", "sha2", "nist-approved"},
+	})
+
+	// HMAC-SHA3 (NIST Approved)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-HMAC-SHA3-001",
+		Name:        "HMAC-SHA3",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(HMAC[-_]?SHA[-_]?3[-_]?(224|256|384|512)?|hmacSha3|HmacSHA3|HMAC\.SHA3)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "HMAC-SHA3",
+		Description: "HMAC with SHA-3 detected. NIST-approved. Good choice for modern applications.",
+		Remediation: "HMAC-SHA3 is a good choice. For SHA-3 native MAC, consider KMAC instead.",
+		References:  []string{"https://csrc.nist.gov/pubs/fips/198-1/final", "https://csrc.nist.gov/pubs/fips/202/final"},
+		Tags:        []string{"mac", "hmac", "sha3", "nist-approved"},
+	})
+
+	// HMAC-SHA1 (Deprecated)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-HMAC-SHA1-001",
+		Name:        "HMAC-SHA1",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(HMAC[-_]?SHA[-_]?1|hmacSha1|HmacSHA1|HMAC\.SHA1|createHmac\s*\(\s*['"]sha1['"])\b`),
+		Severity:    types.SeverityMedium,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "HMAC-SHA1",
+		Description: "HMAC-SHA1 detected. SHA-1 is deprecated for new applications.",
+		Remediation: "Migrate to HMAC-SHA256 or KMAC-256.",
+		Tags:        []string{"mac", "hmac", "sha1", "legacy"},
+	})
+
+	// HMAC-MD5 (Not Approved)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-HMAC-MD5-001",
+		Name:        "HMAC-MD5",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(HMAC[-_]?MD5|hmacMd5|HmacMD5|HMAC\.MD5|createHmac\s*\(\s*['"]md5['"])\b`),
+		Severity:    types.SeverityHigh,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "HMAC-MD5",
+		Description: "HMAC-MD5 detected. MD5 is cryptographically broken. Not NIST-approved.",
+		Remediation: "Replace with HMAC-SHA256 or KMAC-256 immediately.",
+		Tags:        []string{"mac", "hmac", "md5", "weak", "not-approved"},
+	})
+
+	// KMAC (NIST SP 800-185 - Keccak MAC)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-KMAC-001",
+		Name:        "KMAC",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(KMAC[-_]?(128|256)?|keccak[-_]?mac|KECCAK[-_]?MAC)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "KMAC",
+		Description: "KMAC detected (SP 800-185). NIST-approved SHA-3 based MAC. KMAC-256 is quantum-safe.",
+		Remediation: "KMAC is an excellent choice. KMAC-256 provides quantum-safe authentication.",
+		References:  []string{"https://csrc.nist.gov/pubs/sp/800/185/final"},
+		Tags:        []string{"mac", "kmac", "sha3", "nist-approved", "quantum-safe"},
+	})
+
+	// CMAC (NIST SP 800-38B - Cipher-based MAC)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-CMAC-001",
+		Name:        "CMAC",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(CMAC|AES[-_]?CMAC|cipher[-_]?based[-_]?mac)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "CMAC",
+		Description: "CMAC detected (SP 800-38B). NIST-approved cipher-based MAC using AES.",
+		Remediation: "CMAC with AES-256 is acceptable. For maximum quantum resistance, consider KMAC-256.",
+		References:  []string{"https://csrc.nist.gov/pubs/sp/800/38/b/upd1/final"},
+		Tags:        []string{"mac", "cmac", "aes", "nist-approved"},
+	})
+
+	// GMAC (NIST SP 800-38D - GCM authentication only)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-GMAC-001",
+		Name:        "GMAC",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(GMAC|AES[-_]?GMAC|galois[-_]?mac)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "GMAC",
+		Description: "GMAC detected (SP 800-38D). NIST-approved authentication mode of GCM.",
+		Remediation: "GMAC is acceptable for authentication. Typically used as part of AES-GCM.",
+		References:  []string{"https://csrc.nist.gov/pubs/sp/800/38/d/final"},
+		Tags:        []string{"mac", "gmac", "gcm", "nist-approved"},
+	})
+
+	// Poly1305 (IETF RFC 8439)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-POLY1305-001",
+		Name:        "Poly1305",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(Poly1305|poly[-_]?1305)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "Poly1305",
+		Description: "Poly1305 one-time MAC detected (RFC 8439). Used with ChaCha20 for AEAD.",
+		Remediation: "Poly1305 is secure when used correctly as a one-time MAC with ChaCha20.",
+		References:  []string{"https://www.rfc-editor.org/rfc/rfc8439.html"},
+		Tags:        []string{"mac", "poly1305", "ietf"},
+	})
+
+	// CBC-MAC (Legacy - not standalone approved)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "MAC-CBCMAC-001",
+		Name:        "CBC-MAC",
+		Category:    "Message Authentication Code",
+		Regex:       regexp.MustCompile(`(?i)\b(CBC[-_]?MAC|cbc[-_]?mac)\b`),
+		Severity:    types.SeverityMedium,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "CBC-MAC",
+		Description: "CBC-MAC detected. Not a standalone NIST-approved MAC. Use CMAC instead.",
+		Remediation: "Migrate to CMAC (SP 800-38B) which addresses CBC-MAC vulnerabilities.",
+		Tags:        []string{"mac", "cbc-mac", "legacy"},
+	})
+
+	// ============================================
+	// KEY DERIVATION FUNCTIONS (KDFs)
+	// ============================================
+
+	// HKDF (NIST SP 800-56C)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "KDF-HKDF-001",
+		Name:        "HKDF",
+		Category:    "Key Derivation Function",
+		Regex:       regexp.MustCompile(`(?i)\b(HKDF|hkdf[-_]?(extract|expand)?|HMAC[-_]?based[-_]?KDF|HKDFExpand|HKDFExtract)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "HKDF",
+		Description: "HKDF detected (SP 800-56C). NIST-approved KDF for high-entropy inputs.",
+		Remediation: "HKDF is appropriate for key derivation from high-entropy secrets. Not for passwords.",
+		References:  []string{"https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Cr2.pdf", "https://datatracker.ietf.org/doc/html/rfc5869"},
+		Tags:        []string{"kdf", "hkdf", "nist-approved"},
+	})
+
+	// PBKDF2 (NIST SP 800-132)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "KDF-PBKDF2-001",
+		Name:        "PBKDF2",
+		Category:    "Key Derivation Function",
+		Regex:       regexp.MustCompile(`(?i)\b(PBKDF2|pbkdf2[-_]?(sha256|sha512|hmac)?|Password[-_]?Based[-_]?KDF[-_]?2)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "PBKDF2",
+		Description: "PBKDF2 detected (SP 800-132). NIST-approved password-based KDF.",
+		Remediation: "Ensure iteration count >= 600,000 (OWASP 2024). Consider Argon2id for new applications.",
+		References:  []string{"https://csrc.nist.gov/pubs/sp/800/132/final", "https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html"},
+		Tags:        []string{"kdf", "pbkdf2", "password", "nist-approved"},
+	})
+
+	// Argon2 (RFC 9106 - Password Hashing Competition winner)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "KDF-ARGON2-001",
+		Name:        "Argon2",
+		Category:    "Key Derivation Function",
+		Regex:       regexp.MustCompile(`(?i)\b(Argon2(id|i|d)?|argon2[-_]?(id|i|d)?|PasswordHasher\(\).*argon|argon2\.IDKey)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "Argon2",
+		Description: "Argon2 detected (RFC 9106). Password Hashing Competition winner. Recommended for password hashing.",
+		Remediation: "Argon2id is the recommended variant. Use memory >= 64MB, iterations >= 3, parallelism >= 4.",
+		References:  []string{"https://datatracker.ietf.org/doc/html/rfc9106", "https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html"},
+		Tags:        []string{"kdf", "argon2", "password", "recommended"},
+	})
+
+	// scrypt (RFC 7914)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "KDF-SCRYPT-001",
+		Name:        "scrypt",
+		Category:    "Key Derivation Function",
+		Regex:       regexp.MustCompile(`(?i)\b(scrypt|Scrypt)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "scrypt",
+		Description: "scrypt detected (RFC 7914). Memory-hard password-based KDF.",
+		Remediation: "scrypt is acceptable. For new applications, prefer Argon2id.",
+		References:  []string{"https://datatracker.ietf.org/doc/html/rfc7914"},
+		Tags:        []string{"kdf", "scrypt", "password"},
+	})
+
+	// bcrypt
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "KDF-BCRYPT-001",
+		Name:        "bcrypt",
+		Category:    "Key Derivation Function",
+		Regex:       regexp.MustCompile(`(?i)\b(bcrypt|BCrypt|Bcrypt)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "bcrypt",
+		Description: "bcrypt detected. Industry-standard password hashing function.",
+		Remediation: "bcrypt is acceptable with cost >= 12. For new applications, prefer Argon2id.",
+		Tags:        []string{"kdf", "bcrypt", "password"},
+	})
+
+	// ============================================
+	// MODERN HASH FUNCTIONS
+	// ============================================
+
+	// SHA-3 Family (FIPS 202)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "HASH-SHA3-001",
+		Name:        "SHA-3 Hash Function",
+		Category:    "Hash Function",
+		Regex:       regexp.MustCompile(`(?i)\b(SHA[-_]?3[-_]?(224|256|384|512)|sha3_(224|256|384|512)|Keccak[-_]?(224|256|384|512))\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "SHA-3",
+		Description: "SHA-3 hash function detected (FIPS 202). NIST-approved alternative to SHA-2.",
+		Remediation: "SHA-3 is an excellent choice. SHA-3-256 provides 128-bit quantum security.",
+		References:  []string{"https://csrc.nist.gov/pubs/fips/202/final"},
+		Tags:        []string{"hash", "sha3", "nist-approved", "fips-202"},
+	})
+
+	// SHAKE (FIPS 202 - XOF)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "HASH-SHAKE-001",
+		Name:        "SHAKE Extendable Output Function",
+		Category:    "Hash Function",
+		Regex:       regexp.MustCompile(`(?i)\b(SHAKE[-_]?(128|256)|shake(128|256)|cSHAKE[-_]?(128|256))\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "SHAKE",
+		Description: "SHAKE XOF detected (FIPS 202). NIST-approved extendable output function. SHAKE256 is quantum-safe.",
+		Remediation: "SHAKE256 provides quantum-safe security with variable output length.",
+		References:  []string{"https://csrc.nist.gov/pubs/fips/202/final"},
+		Tags:        []string{"hash", "xof", "shake", "nist-approved", "quantum-safe"},
+	})
+
+	// BLAKE2 (RFC 7693)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "HASH-BLAKE2-001",
+		Name:        "BLAKE2 Hash Function",
+		Category:    "Hash Function",
+		Regex:       regexp.MustCompile(`(?i)\b(BLAKE2(b|s)?[-_]?(256|384|512)?|blake2(b|s)?)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "BLAKE2",
+		Description: "BLAKE2 detected (RFC 7693). Fast, secure hash function. Not NIST-approved but widely used.",
+		Remediation: "BLAKE2 is secure and fast. For NIST compliance, use SHA-256 or SHA-3.",
+		References:  []string{"https://www.rfc-editor.org/rfc/rfc7693"},
+		Tags:        []string{"hash", "blake2", "ietf"},
+	})
+
+	// BLAKE3
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "HASH-BLAKE3-001",
+		Name:        "BLAKE3 Hash Function",
+		Category:    "Hash Function",
+		Regex:       regexp.MustCompile(`(?i)\b(BLAKE3|blake3)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "BLAKE3",
+		Description: "BLAKE3 detected. Modern, parallelizable hash function. Not yet standardized.",
+		Remediation: "BLAKE3 is secure and very fast. For compliance requirements, use SHA-256 or SHA-3.",
+		Tags:        []string{"hash", "blake3"},
+	})
+
+	// ============================================
+	// MODERN SYMMETRIC ENCRYPTION
+	// ============================================
+
+	// ChaCha20-Poly1305 (RFC 8439)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "SYM-CHACHA-001",
+		Name:        "ChaCha20-Poly1305",
+		Category:    "Symmetric Encryption",
+		Regex:       regexp.MustCompile(`(?i)\b(ChaCha20[-_]?Poly1305|chacha20[-_]?poly1305|CHACHA20_POLY1305|TLS_CHACHA20_POLY1305)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "ChaCha20-Poly1305",
+		Description: "ChaCha20-Poly1305 AEAD detected (RFC 8439). Fast, secure authenticated encryption.",
+		Remediation: "ChaCha20-Poly1305 is an excellent choice. Included in TLS 1.3.",
+		References:  []string{"https://www.rfc-editor.org/rfc/rfc8439.html"},
+		Tags:        []string{"symmetric", "aead", "chacha20", "ietf", "tls13"},
+	})
+
+	// ChaCha20 (standalone stream cipher)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "SYM-CHACHA20-001",
+		Name:        "ChaCha20 Stream Cipher",
+		Category:    "Symmetric Encryption",
+		Regex:       regexp.MustCompile(`(?i)\b(ChaCha20|chacha20|ChaCha[-_]?20)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "ChaCha20",
+		Description: "ChaCha20 stream cipher detected. Fast software cipher, alternative to AES.",
+		Remediation: "ChaCha20 should be used with Poly1305 for authenticated encryption (ChaCha20-Poly1305).",
+		Tags:        []string{"symmetric", "stream-cipher", "chacha20"},
+	})
+
+	// XChaCha20 (extended nonce)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "SYM-XCHACHA-001",
+		Name:        "XChaCha20",
+		Category:    "Symmetric Encryption",
+		Regex:       regexp.MustCompile(`(?i)\b(XChaCha20[-_]?Poly1305|xchacha20)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "XChaCha20",
+		Description: "XChaCha20 detected. Extended nonce variant of ChaCha20 for random nonce generation.",
+		Remediation: "XChaCha20-Poly1305 is excellent when random nonces are preferred over counters.",
+		Tags:        []string{"symmetric", "aead", "xchacha20"},
+	})
+
+	// AES-GCM (NIST SP 800-38D) - explicit detection for good practice
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "SYM-AESGCM-001",
+		Name:        "AES-GCM Authenticated Encryption",
+		Category:    "Symmetric Encryption",
+		Regex:       regexp.MustCompile(`(?i)\b(AES[-_]?(128|192|256)[-_]?GCM|AES[-/]GCM|GCM[-_]?AES|TLS_AES_(128|256)_GCM)\b`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumPartial,
+		Algorithm:   "AES-GCM",
+		Description: "AES-GCM AEAD detected (SP 800-38D). NIST-approved authenticated encryption.",
+		Remediation: "AES-256-GCM is recommended. Provides confidentiality and integrity.",
+		References:  []string{"https://csrc.nist.gov/pubs/sp/800/38/d/final"},
+		Tags:        []string{"symmetric", "aead", "aes", "gcm", "nist-approved"},
+	})
+
+	// ============================================
+	// COMPOSITE/HYBRID SIGNATURES
+	// ============================================
+
+	// Composite Signature OIDs (draft standards)
+	m.patterns = append(m.patterns, Pattern{
+		ID:          "HYBRID-SIG-001",
+		Name:        "Composite Digital Signature",
+		Category:    "Hybrid Cryptography",
+		Regex:       regexp.MustCompile(`(?i)(MLDSA44[-_]?RSA2048|MLDSA65[-_]?ECDSA[-_]?P256|MLDSA65[-_]?Ed25519|composite[-_]?signature|dual[-_]?signature|id[-_]?MLDSA.*RSA|id[-_]?MLDSA.*ECDSA)`),
+		Severity:    types.SeverityInfo,
+		Quantum:     types.QuantumSafe,
+		Algorithm:   "Composite-Signature",
+		Description: "Composite/hybrid digital signature detected. Combines classical and PQC signatures.",
+		Remediation: "Composite signatures are excellent for PQC transition. Both signatures must verify.",
+		Tags:        []string{"hybrid", "signature", "quantum-safe", "composite"},
+	})
 }

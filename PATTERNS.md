@@ -1,15 +1,19 @@
 # CryptoScan Detection Patterns
 
-CryptoScan uses 50+ detection patterns to identify cryptographic algorithms, protocols, keys, and configurations in your codebase. Each pattern includes quantum risk classification and remediation guidance.
+CryptoScan uses 100+ detection patterns to identify cryptographic algorithms, protocols, keys, and configurations in your codebase. Each pattern includes quantum risk classification and remediation guidance.
 
 ## Table of Contents
 
 - [How Detection Works](#how-detection-works)
 - [Confidence Scoring](#confidence-scoring)
 - [Pattern Categories](#pattern-categories)
+  - [Post-Quantum Cryptography](#post-quantum-cryptography) *(NEW)*
+  - [Hybrid Cryptography](#hybrid-cryptography) *(NEW)*
   - [Asymmetric Encryption](#asymmetric-encryption)
   - [Symmetric Encryption](#symmetric-encryption)
   - [Hash Functions](#hash-functions)
+  - [Message Authentication Codes (MACs)](#message-authentication-codes-macs) *(NEW)*
+  - [Key Derivation Functions (KDFs)](#key-derivation-functions-kdfs) *(NEW)*
   - [TLS/SSL Protocols](#tlsssl-protocols)
   - [Key Material & Secrets](#key-material--secrets)
   - [Cloud KMS Services](#cloud-kms-services)
@@ -80,6 +84,48 @@ key, err := rsa.GenerateKey(rand.Reader, 2048)
 
 ## Pattern Categories
 
+### Post-Quantum Cryptography
+
+NIST-standardized algorithms resistant to quantum computer attacks.
+
+| Pattern ID | Name | Quantum Risk | Severity | What It Detects |
+|------------|------|--------------|----------|-----------------|
+| PQC-MLKEM-001 | ML-KEM Key Encapsulation | SAFE | Info | `ML-KEM-512`, `ML-KEM-768`, `ML-KEM-1024`, `Kyber512`, `Kyber768`, `Kyber1024` |
+| PQC-MLDSA-001 | ML-DSA Digital Signatures | SAFE | Info | `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87`, `Dilithium2`, `Dilithium3`, `Dilithium5` |
+| PQC-SLHDSA-001 | SLH-DSA Hash-Based Signatures | SAFE | Info | `SLH-DSA-128f`, `SLH-DSA-192s`, `SPHINCS+`, `SPHINCS+-SHA2-128f` |
+| PQC-FNDSA-001 | FN-DSA (Falcon) Signatures | SAFE | Info | `FN-DSA-512`, `FN-DSA-1024`, `Falcon-512`, `Falcon-1024` |
+| PQC-XMSS-001 | XMSS Stateful Signatures | SAFE | Low | `XMSS-SHA2_10_256`, `XMSS-SHAKE_20_256`, `XMSSMT` |
+| PQC-LMS-001 | LMS Stateful Signatures | SAFE | Low | `LMS`, `HSS`, `LMS_SHA256_M24_H10` |
+
+**Note on Naming**: CryptoScan recognizes both NIST FIPS names and legacy names:
+- ML-KEM (FIPS 203) = Kyber
+- ML-DSA (FIPS 204) = Dilithium
+- SLH-DSA (FIPS 205) = SPHINCS+
+- FN-DSA (FIPS 206 draft) = Falcon
+
+**Stateful Signatures Warning**: XMSS and LMS require careful state management. Each key can only sign a limited number of messages.
+
+---
+
+### Hybrid Cryptography
+
+Combines classical and post-quantum algorithms for defense-in-depth during the transition period.
+
+| Pattern ID | Name | Quantum Risk | Severity | What It Detects |
+|------------|------|--------------|----------|-----------------|
+| HYBRID-KEM-001 | X25519+ML-KEM Hybrid Key Exchange | HYBRID | Info | `X25519MLKEM768`, `X25519Kyber768`, hybrid key exchange combinations |
+| HYBRID-SIG-001 | ECDSA+ML-DSA Composite Signatures | HYBRID | Info | `MLDSA65-ECDSA-P256`, `Dilithium3-ECDSA`, composite signatures |
+| HYBRID-SIG-002 | RSA+ML-DSA Composite Signatures | HYBRID | Info | `MLDSA65-RSA3072`, RSA+PQC composite combinations |
+
+**Why Hybrid?**
+- Security holds if EITHER algorithm remains secure
+- Recommended transition approach by NIST and NSA
+- Provides protection if PQC algorithms have undiscovered weaknesses
+
+**Note**: Hybrid implementations add overhead but provide maximum security during the cryptographic transition period.
+
+---
+
 ### Asymmetric Encryption
 
 Algorithms vulnerable to Shor's algorithm on quantum computers.
@@ -105,15 +151,21 @@ Symmetric algorithms have varying quantum resistance.
 
 | Pattern ID | Name | Quantum Risk | Severity | What It Detects |
 |------------|------|--------------|----------|-----------------|
-| AES-001 | AES Algorithm | PARTIAL | Info | `AES-128`, `AES-256`, `AES-GCM`, `AES-CBC` |
+| AES-GCM-001 | AES-GCM (AEAD) | SAFE | Info | `AES-256-GCM`, `aes-256-gcm` (NIST SP 800-38D) |
+| CHACHA-001 | ChaCha20-Poly1305 (AEAD) | SAFE | Info | `ChaCha20-Poly1305`, `chacha20-poly1305` (RFC 8439) |
+| AES-001 | AES Algorithm | PARTIAL | Info | `AES-128`, `AES-256`, `AES-CBC` |
 | AES-ECB | AES-ECB Mode | PARTIAL | Critical | ECB mode (insecure regardless of quantum) |
 | DES-001 | DES Algorithm | VULNERABLE | Critical | `DES`, `DES-CBC` (56-bit, completely broken) |
 | 3DES-001 | Triple DES | VULNERABLE | High | `3DES`, `Triple-DES`, `DESede` |
 | RC4-001 | RC4 Stream Cipher | VULNERABLE | Critical | `RC4`, `ARC4`, `ARCFOUR` |
 | BLOWFISH-001 | Blowfish | PARTIAL | Medium | `Blowfish` (64-bit block, birthday attacks) |
 
+**Recommended AEAD Ciphers** (provide both encryption and authentication):
+- **AES-256-GCM**: NIST-approved, widely supported
+- **ChaCha20-Poly1305**: IETF standard, excellent for software implementations
+
 **Remediation**:
-- Use AES-256-GCM for symmetric encryption
+- Use AES-256-GCM or ChaCha20-Poly1305 for symmetric encryption
 - Never use ECB mode
 - Replace DES, 3DES, RC4 immediately
 
@@ -126,6 +178,10 @@ Symmetric algorithms have varying quantum resistance.
 | MD5-001 | MD5 Hash | VULNERABLE | Critical | `MD5`, `md5()`, `hashlib.md5` |
 | SHA1-001 | SHA-1 Hash | VULNERABLE | High | `SHA-1`, `sha1()`, `hashlib.sha1` |
 | SHA2-001 | SHA-2 Family | PARTIAL | Info | `SHA-256`, `SHA-384`, `SHA-512` |
+| SHA3-001 | SHA-3 Family | SAFE | Info | `SHA3-256`, `SHA3-384`, `SHA3-512` (FIPS 202) |
+| SHAKE-001 | SHAKE XOF | SAFE | Info | `SHAKE128`, `SHAKE256` (FIPS 202 - quantum-safe) |
+| BLAKE2-001 | BLAKE2 | PARTIAL | Info | `BLAKE2b`, `BLAKE2s` (not NIST but widely used) |
+| BLAKE3-001 | BLAKE3 | PARTIAL | Info | `BLAKE3` (not NIST but widely used) |
 
 **Why MD5 and SHA-1 are Critical**:
 - MD5: Collision attacks demonstrated in 2004
@@ -133,6 +189,57 @@ Symmetric algorithms have varying quantum resistance.
 - Both are broken for security purposes, regardless of quantum
 
 **Remediation**: Use SHA-256 or SHA-3 for integrity checks.
+
+---
+
+### Message Authentication Codes (MACs)
+
+MACs provide integrity and authenticity verification.
+
+| Pattern ID | Name | Quantum Risk | Severity | What It Detects |
+|------------|------|--------------|----------|-----------------|
+| MAC-HMAC-256 | HMAC-SHA256 | PARTIAL | Info | `HMAC-SHA256`, `hmac.New(sha256.New)`, `createHmac('sha256')` |
+| MAC-HMAC-384 | HMAC-SHA384 | SAFE | Info | `HMAC-SHA384`, `hmac.New(sha384.New)` |
+| MAC-HMAC-512 | HMAC-SHA512 | SAFE | Info | `HMAC-SHA512`, `hmac.New(sha512.New)` |
+| MAC-HMAC-SHA3 | HMAC-SHA3 | SAFE | Info | `HMAC-SHA3-256`, `hmac.New(sha3.New256)` |
+| MAC-KMAC-001 | KMAC-128/256 | SAFE | Info | `KMAC128`, `KMAC256`, `sha3.NewKMAC256` (SP 800-185 quantum-safe) |
+| MAC-CMAC-001 | CMAC | PARTIAL | Info | `CMAC-AES`, `AES-CMAC` (NIST SP 800-38B) |
+| MAC-GMAC-001 | GMAC | PARTIAL | Info | `GMAC`, `AES-GMAC`, GCM authentication tag |
+| MAC-POLY1305-001 | Poly1305 | PARTIAL | Info | `Poly1305`, `chacha20-poly1305` authentication |
+| MAC-CBC-001 | CBC-MAC | PARTIAL | Medium | `CBC-MAC` (not standalone approved, use CMAC) |
+
+**NIST-Approved MACs**: HMAC (all SHA variants), KMAC, CMAC, GMAC
+**Quantum-Safe**: KMAC is specifically designed for quantum resistance (SP 800-185)
+
+**Remediation**:
+- Prefer HMAC-SHA256/384/512 for most use cases
+- Use KMAC for maximum quantum safety
+- Replace CBC-MAC with CMAC
+
+---
+
+### Key Derivation Functions (KDFs)
+
+KDFs derive cryptographic keys from passwords or other input material.
+
+| Pattern ID | Name | Quantum Risk | Severity | What It Detects |
+|------------|------|--------------|----------|-----------------|
+| KDF-HKDF-001 | HKDF | PARTIAL | Info | `HKDF`, `hkdf.New`, `crypto.hkdfSync` (SP 800-56C) |
+| KDF-PBKDF2-001 | PBKDF2 | PARTIAL | Info | `PBKDF2`, `pbkdf2.Key`, `crypto.pbkdf2` (SP 800-132) |
+| KDF-ARGON2-001 | Argon2id | PARTIAL | Info | `Argon2id`, `Argon2i`, `Argon2d`, `argon2.IDKey` (RFC 9106) |
+| KDF-SCRYPT-001 | scrypt | PARTIAL | Info | `scrypt`, `crypto.scrypt`, `x/crypto/scrypt` |
+| KDF-BCRYPT-001 | bcrypt | PARTIAL | Info | `bcrypt`, `bcrypt.GenerateFromPassword` |
+| KDF-PBKDF1-001 | PBKDF1 | VULNERABLE | High | `PBKDF1` (deprecated, use PBKDF2) |
+
+**Password Hashing Recommendations** (OWASP 2024):
+- **Argon2id**: Recommended for new applications (RFC 9106)
+- **bcrypt**: Industry standard, well-tested
+- **PBKDF2**: NIST-approved, 600,000+ iterations for SHA-256
+
+**Key Derivation from Secrets**:
+- **HKDF**: Use for deriving keys from high-entropy secrets (SP 800-56C)
+
+**Note**: Argon2 and scrypt are not yet NIST-approved but are widely recommended by security researchers.
 
 ---
 
@@ -209,9 +316,10 @@ Detects imports of cryptographic libraries for inventory purposes.
 
 | Risk | Algorithm Examples | Threat | Timeline |
 |------|-------------------|--------|----------|
-| **VULNERABLE** | RSA, ECDSA, DH, DSA | Shor's algorithm breaks these completely | Migrate by 2030 |
-| **PARTIAL** | AES-128, SHA-256 | Grover's algorithm halves security (128→64 bit) | Use larger keys |
-| **SAFE** | AES-256, SHA-384, ML-KEM | Quantum-resistant | No action needed |
+| **VULNERABLE** | RSA, ECDSA, DH, DSA, Ed25519 | Shor's algorithm breaks these completely | Migrate by 2030 |
+| **PARTIAL** | AES-128, SHA-256, HMAC-SHA256 | Grover's algorithm halves security (128→64 bit) | Use larger keys |
+| **HYBRID** | X25519+ML-KEM, ECDSA+ML-DSA | Defense in depth during transition | Good transition approach |
+| **SAFE** | AES-256, SHA-384, ML-KEM, ML-DSA, SLH-DSA, KMAC | Quantum-resistant | No action needed |
 | **UNKNOWN** | Custom/proprietary | Cannot determine | Manual review |
 
 ---
@@ -245,8 +353,21 @@ Each pattern requires:
 
 ## References
 
+### Post-Quantum Cryptography
 - [NIST FIPS 203 - ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)
 - [NIST FIPS 204 - ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
 - [NIST FIPS 205 - SLH-DSA](https://csrc.nist.gov/pubs/fips/205/final)
+- [NIST FIPS 206 - FN-DSA (Draft)](https://csrc.nist.gov/pubs/fips/206/ipd)
+- [NIST SP 800-208 - XMSS and LMS](https://csrc.nist.gov/pubs/sp/800/208/final)
+
+### MACs and KDFs
+- [NIST SP 800-185 - SHA-3 Derived Functions (KMAC)](https://csrc.nist.gov/pubs/sp/800/185/final)
+- [NIST SP 800-38B - CMAC](https://csrc.nist.gov/pubs/sp/800/38/b/final)
+- [NIST SP 800-56C - Key Derivation (HKDF)](https://csrc.nist.gov/pubs/sp/800/56/c/r2/final)
+- [NIST SP 800-132 - PBKDF](https://csrc.nist.gov/pubs/sp/800/132/final)
+- [RFC 9106 - Argon2](https://www.rfc-editor.org/rfc/rfc9106.html)
+
+### Classical Cryptography
 - [NIST SP 800-131A Rev 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final)
 - [OWASP Cryptographic Failures](https://owasp.org/Top10/A02_2021-Cryptographic_Failures/)
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)

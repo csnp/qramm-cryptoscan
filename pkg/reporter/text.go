@@ -81,8 +81,14 @@ func (r *TextReporter) Generate(results *scanner.Results) (string, error) {
 	b.WriteString("\n")
 	b.WriteString(r.color(colorBold, "╔═══════════════════════════════════════════════════════════════╗\n"))
 	b.WriteString(r.color(colorBold, "║              CRYPTOGRAPHIC SCAN RESULTS                       ║\n"))
+	b.WriteString(r.color(colorBold, "║                    QRAMM CryptoScan                           ║\n"))
 	b.WriteString(r.color(colorBold, "╚═══════════════════════════════════════════════════════════════╝\n"))
 	b.WriteString("\n")
+
+	// Migration Readiness Score (the key feature)
+	if results.MigrationScore != nil {
+		r.writeMigrationScore(&b, results.MigrationScore)
+	}
 
 	// Scan metadata in a box
 	b.WriteString(r.color(colorCyan, "┌─ Scan Information ─────────────────────────────────────────────┐\n"))
@@ -371,10 +377,110 @@ func (r *TextReporter) generateGroupedByFile(results *scanner.Results, b *string
 	return b.String(), nil
 }
 
+func (r *TextReporter) writeMigrationScore(b *strings.Builder, score *scanner.MigrationScore) {
+	// Migration Readiness Score box
+	b.WriteString(r.color(colorBold+colorCyan, "┌─ QUANTUM MIGRATION READINESS ──────────────────────────────────┐\n"))
+
+	// Score visualization
+	scoreInt := int(score.Score)
+	filledBars := scoreInt / 4 // 25 bars = 100%
+	emptyBars := 25 - filledBars
+
+	scoreColor := colorRed
+	if score.Score >= 75 {
+		scoreColor = colorGreen
+	} else if score.Score >= 50 {
+		scoreColor = colorYellow
+	} else if score.Score >= 25 {
+		scoreColor = colorYellow
+	}
+
+	progressBar := r.color(scoreColor, strings.Repeat("█", filledBars)) + strings.Repeat("░", emptyBars)
+	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, fmt.Sprintf("  Score: %s %.1f%% ", progressBar, score.Score)))
+
+	// Risk level badge
+	levelColor := colorRed
+	switch score.Level {
+	case "LOW":
+		levelColor = colorGreen
+	case "MEDIUM":
+		levelColor = colorYellow
+	case "HIGH":
+		levelColor = colorRed
+	case "CRITICAL":
+		levelColor = colorRed + colorBold
+	}
+	b.WriteString(r.color(levelColor, fmt.Sprintf("[%s]", score.Level)))
+	b.WriteString(r.color(colorCyan, fmt.Sprintf("%s│\n", strings.Repeat(" ", 8-len(score.Level)))))
+
+	b.WriteString(r.color(colorCyan, "│") + r.color(colorCyan, "─────────────────────────────────────────────────────────────────") + r.color(colorCyan, "│\n"))
+
+	// Status breakdown
+	b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, "  INVENTORY                                                     ") + r.color(colorCyan, "│\n"))
+	b.WriteString(r.color(colorCyan, "│") + fmt.Sprintf("    %s Safe (PQC):        %-5d", r.color(colorGreen, "✓"), score.SafeCount) + fmt.Sprintf("    %s Vulnerable:    %-5d", r.color(colorRed, "✗"), score.VulnerableCount) + r.color(colorCyan, "   │\n"))
+	b.WriteString(r.color(colorCyan, "│") + fmt.Sprintf("    %s Hybrid:            %-5d", r.color(colorGreen, "◐"), score.HybridCount) + fmt.Sprintf("    %s Critical:      %-5d", r.color(colorRed+colorBold, "⚠"), score.CriticalCount) + r.color(colorCyan, "   │\n"))
+	b.WriteString(r.color(colorCyan, "│") + fmt.Sprintf("    %s Partial:           %-5d", r.color(colorYellow, "◑"), score.PartialCount) + fmt.Sprintf("    Total:          %-5d", score.TotalCount) + r.color(colorCyan, "   │\n"))
+
+	// QRAMM Readiness
+	if score.QRAMMReadiness != nil {
+		b.WriteString(r.color(colorCyan, "│") + r.color(colorCyan, "─────────────────────────────────────────────────────────────────") + r.color(colorCyan, "│\n"))
+		b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, "  QRAMM DIMENSION 1: Cryptographic Visibility & Inventory (CVI) ") + r.color(colorCyan, "│\n"))
+
+		// Practice levels
+		b.WriteString(r.color(colorCyan, "│") + fmt.Sprintf("    Practice 1.1 Discovery:   Level %d/5 %s", score.QRAMMReadiness.DiscoveryLevel, r.maturityIndicator(score.QRAMMReadiness.DiscoveryLevel)) + r.color(colorCyan, "                    │\n"))
+		b.WriteString(r.color(colorCyan, "│") + fmt.Sprintf("    Practice 1.2 Assessment:  Level %d/5 %s", score.QRAMMReadiness.AssessmentLevel, r.maturityIndicator(score.QRAMMReadiness.AssessmentLevel)) + r.color(colorCyan, "                    │\n"))
+		b.WriteString(r.color(colorCyan, "│") + fmt.Sprintf("    Practice 1.3 Mapping:     Level %d/5 %s", score.QRAMMReadiness.MappingLevel, r.maturityIndicator(score.QRAMMReadiness.MappingLevel)) + r.color(colorCyan, "                    │\n"))
+	}
+
+	// Top risk files
+	if len(score.TopRiskFiles) > 0 {
+		b.WriteString(r.color(colorCyan, "│") + r.color(colorCyan, "─────────────────────────────────────────────────────────────────") + r.color(colorCyan, "│\n"))
+		b.WriteString(r.color(colorCyan, "│") + r.color(colorBold, "  TOP PRIORITY FILES                                            ") + r.color(colorCyan, "│\n"))
+		for i, f := range score.TopRiskFiles {
+			if i >= 3 {
+				break
+			}
+			truncFile := truncatePath(f.File, 40)
+			b.WriteString(r.color(colorCyan, "│") + fmt.Sprintf("    %d. %-42s (%d findings)", i+1, truncFile, f.TotalFindings) + r.color(colorCyan, "  │\n"))
+		}
+	}
+
+	// Recommendations
+	if score.QRAMMReadiness != nil && len(score.QRAMMReadiness.Recommendations) > 0 {
+		b.WriteString(r.color(colorCyan, "│") + r.color(colorCyan, "─────────────────────────────────────────────────────────────────") + r.color(colorCyan, "│\n"))
+		b.WriteString(r.color(colorCyan, "│") + r.color(colorBold+colorGreen, "  RECOMMENDATIONS                                               ") + r.color(colorCyan, "│\n"))
+		for i, rec := range score.QRAMMReadiness.Recommendations {
+			if i >= 3 {
+				break
+			}
+			// Truncate recommendation to fit
+			if len(rec) > 60 {
+				rec = rec[:57] + "..."
+			}
+			b.WriteString(r.color(colorCyan, "│") + fmt.Sprintf("    • %-59s", rec) + r.color(colorCyan, "│\n"))
+		}
+	}
+
+	b.WriteString(r.color(colorBold+colorCyan, "└─────────────────────────────────────────────────────────────────┘\n"))
+	b.WriteString("\n")
+}
+
+func (r *TextReporter) maturityIndicator(level int) string {
+	filled := strings.Repeat("●", level)
+	empty := strings.Repeat("○", 5-level)
+	if level >= 4 {
+		return r.color(colorGreen, filled) + empty
+	} else if level >= 3 {
+		return r.color(colorYellow, filled) + empty
+	}
+	return r.color(colorRed, filled) + empty
+}
+
 func (r *TextReporter) writeFooter(b *strings.Builder) {
 	b.WriteString(r.color(colorBold, "═══════════════════════════════════════════════════════════════\n"))
-	b.WriteString(r.color(colorCyan, "  Crypto Scan") + " - Part of the QRAMM Toolkit\n")
-	b.WriteString("  https://qramm.org  •  https://csnp.org\n")
+	b.WriteString(r.color(colorCyan, "  QRAMM CryptoScan") + " - Quantum Readiness Assessment Tool\n")
+	b.WriteString("  Part of the QRAMM Toolkit: https://qramm.org\n")
+	b.WriteString("  Developed by CSNP: https://csnp.org\n")
 	b.WriteString("\n")
 	b.WriteString(r.color(colorGreen, "  CSNP Mission: ") + "Advancing cybersecurity through education,\n")
 	b.WriteString("  research, and open-source tools that empower organizations.\n")

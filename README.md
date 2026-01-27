@@ -3,7 +3,7 @@
 <h3 align="center">Cryptographic Discovery for the Post-Quantum Era</h3>
 
 <p align="center">
-  <strong>Find every cryptographic algorithm in your codebase. Know your quantum risk. Plan your migration.</strong>
+  <strong>Find every cryptographic algorithm in your codebase. Know your quantum risk. Get a Migration Readiness Score. Plan your migration.</strong>
 </p>
 
 <p align="center">
@@ -40,6 +40,10 @@ CryptoScan is purpose-built for quantum readiness assessment:
 | Remote Git URL scanning | **Yes** | No | Some |
 | Source code context | **Yes** | No | Rarely |
 | Quantum risk classification | **Yes** | No | Some |
+| **Post-Quantum Crypto detection** | **Yes** | No | Rarely |
+| **Migration Readiness Score** | **Yes** | No | No |
+| **Hybrid crypto recognition** | **Yes** | No | Rarely |
+| **QRAMM framework mapping** | **Yes** | No | No |
 | Context-aware confidence | **Yes** | No | Varies |
 | CBOM output | **Yes** | No | Rarely |
 | SARIF for GitHub Security | **Yes** | No | Yes |
@@ -59,6 +63,14 @@ CryptoScan is purpose-built for quantum readiness assessment:
 **Source code context** — Every finding includes the 3 lines before and after the match, so you can immediately understand the context without opening the file. Know if it's in a comment, test, or production code at a glance.
 
 **Quantum risk classification** — Each finding is tagged with its quantum computing threat level: VULNERABLE (broken by Shor's algorithm), PARTIAL (weakened by Grover's algorithm), SAFE (quantum-resistant), or UNKNOWN. This tells you exactly what needs to migrate first.
+
+**Post-Quantum Crypto detection** — Detects NIST-standardized PQC algorithms including ML-KEM (FIPS 203), ML-DSA (FIPS 204), SLH-DSA (FIPS 205), and draft FN-DSA (FIPS 206). Also detects stateful hash-based signatures (XMSS, LMS per SP 800-208). Recognizes both new FIPS names and legacy names (Kyber, Dilithium, SPHINCS+).
+
+**Migration Readiness Score** — Get an instant percentage score showing how prepared your codebase is for the post-quantum transition. The score weighs quantum-safe algorithms (100%), hybrid implementations (80%), and partial safety (30%) against vulnerable and critical findings. Includes top-risk files to prioritize.
+
+**Hybrid crypto recognition** — Identifies hybrid cryptographic implementations that combine classical and post-quantum algorithms for defense-in-depth. Detects patterns like X25519+ML-KEM key exchange and ECDSA+ML-DSA composite signatures—the recommended transition approach.
+
+**QRAMM framework mapping** — Maps all findings to the Quantum Readiness Assurance Maturity Model (QRAMM) Dimension 1: Cryptographic Visibility & Inventory. Shows your maturity level for Discovery (Practice 1.1), Vulnerability Assessment (Practice 1.2), and Dependency Mapping (Practice 1.3).
 
 **Context-aware confidence** — Not all matches are equal. CryptoScan reduces confidence for findings in comments, documentation, log messages, and test files. High-confidence findings in production code are prioritized over low-confidence matches in docs.
 
@@ -131,13 +143,16 @@ git clone https://github.com/csnp/qramm-cryptoscan.git
 cd qramm-cryptoscan
 go build -o cryptoscan ./cmd/cryptoscan
 
-# Scan the sample files (Go, Python, Java)
+# Scan the sample files (Go, Python, Java, JavaScript)
 ./cryptoscan scan ./crypto-samples
 
-# Expected: ~35 findings showing various crypto patterns
+# Expected: ~100+ findings showing various crypto patterns including:
+# - Post-Quantum: ML-KEM, ML-DSA, SLH-DSA, XMSS, LMS
+# - Hybrid: X25519+ML-KEM, ECDSA+ML-DSA composite
 # - Quantum vulnerable: RSA, ECDSA, Ed25519
-# - Broken/weak: MD5, SHA-1, DES, 3DES
-# - With source context and remediation guidance
+# - MACs: HMAC-SHA256/512, KMAC
+# - KDFs: HKDF, PBKDF2, Argon2id, bcrypt
+# - With Migration Readiness Score and QRAMM mapping
 ```
 
 ## Features
@@ -148,16 +163,20 @@ CryptoScan identifies cryptographic usage across your entire technology stack:
 
 | Category | What We Detect |
 |----------|----------------|
+| **Post-Quantum Cryptography** | ML-KEM (Kyber), ML-DSA (Dilithium), SLH-DSA (SPHINCS+), FN-DSA (Falcon), XMSS, LMS |
+| **Hybrid Cryptography** | X25519+ML-KEM, ECDSA+ML-DSA composite signatures, hybrid TLS key exchange |
 | **Asymmetric Encryption** | RSA (all key sizes), ECDSA, DSA, DH, ECDH, Ed25519, X25519 |
-| **Symmetric Encryption** | AES (CBC, GCM, ECB, CTR), DES, 3DES, RC4, Blowfish, ChaCha20 |
-| **Hash Functions** | MD5, SHA-1, SHA-2 (256/384/512), SHA-3, BLAKE2, RIPEMD |
+| **Symmetric Encryption** | AES (CBC, GCM, ECB, CTR), ChaCha20-Poly1305, DES, 3DES, RC4, Blowfish |
+| **Hash Functions** | SHA-2, SHA-3, SHAKE128/256, BLAKE2, BLAKE3, MD5, SHA-1 |
+| **MACs** | HMAC-SHA256/384/512, HMAC-SHA3, KMAC128/256, CMAC, GMAC, Poly1305 |
+| **Key Derivation (KDFs)** | HKDF, PBKDF2, Argon2id, scrypt, bcrypt |
 | **TLS/SSL** | Protocol versions, cipher suites, weak configurations |
 | **Key Material** | Private keys (RSA, EC, SSH, PGP, PKCS#8), JWT secrets, HMAC keys |
 | **Cloud KMS** | AWS KMS, Azure Key Vault, GCP Cloud KMS, HashiCorp Vault |
 | **Dependencies** | Crypto libraries across 20+ package managers |
 | **Configurations** | Hardcoded key sizes, algorithm selections, TLS settings |
 
-**[50+ detection patterns](PATTERNS.md)** with context-aware confidence scoring to minimize false positives.
+**[100+ detection patterns](PATTERNS.md)** with context-aware confidence scoring to minimize false positives.
 
 ### Quantum Risk Classification
 
@@ -167,8 +186,53 @@ Every finding is classified by quantum computing threat level:
 |------------|---------|--------|-------------------|
 | **VULNERABLE** | Broken by quantum computers | Shor's algorithm | Migrate to PQC now |
 | **PARTIAL** | Security reduced by quantum | Grover's algorithm | Increase key sizes |
+| **HYBRID** | Combined classical + PQC | Defense in depth | Good transition approach |
 | **SAFE** | Quantum-resistant | N/A | No action needed |
 | **UNKNOWN** | Cannot determine | Unknown | Manual review required |
+
+### Migration Readiness Score
+
+CryptoScan calculates a **Migration Readiness Score** that tells you at a glance how prepared your codebase is for the post-quantum transition:
+
+```
+═══════════════════════════════════════════════════════════════════════════════
+                         MIGRATION READINESS SCORE
+═══════════════════════════════════════════════════════════════════════════════
+
+  Score: 41.9%  [██████████░░░░░░░░░░░░░░░░░░░░]  CRITICAL
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  Safe (Quantum-Resistant)     33  ████████████████████████████████      │
+  │  Hybrid (Transition)           4  ████                                  │
+  │  Partial (Needs Upgrade)      44  ████████████████████████████████████  │
+  │  Vulnerable (Quantum Risk)    28  ████████████████████████████          │
+  │  Critical (Immediate Risk)     9  █████████                             │
+  └─────────────────────────────────────────────────────────────────────────┘
+```
+
+The score formula: `(Safe + Hybrid×0.8 + Partial×0.3) / Total × 100`
+
+**Score Levels:**
+- **EXCELLENT** (90%+): Ready for post-quantum transition
+- **GOOD** (70-89%): Minor remediation needed
+- **MODERATE** (50-69%): Significant work required
+- **POOR** (30-49%): Major migration effort needed
+- **CRITICAL** (<30%): Urgent action required
+
+### QRAMM Framework Integration
+
+CryptoScan maps findings to the **Quantum Readiness Assurance Maturity Model (QRAMM)** Dimension 1: Cryptographic Visibility & Inventory (CVI):
+
+```
+  QRAMM CVI Readiness:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  Practice 1.1 (Discovery)     Level 3/5  ████████████░░░░░░░░           │
+  │  Practice 1.2 (Assessment)    Level 3/5  ████████████░░░░░░░░           │
+  │  Practice 1.3 (Mapping)       Level 3/5  ████████████░░░░░░░░           │
+  └─────────────────────────────────────────────────────────────────────────┘
+```
+
+This helps you understand where you stand in your quantum readiness journey using the industry-standard QRAMM framework.
 
 ### Context-Aware Analysis
 
@@ -405,28 +469,35 @@ qramm-cryptoscan/
 ├── cmd/cryptoscan/      # CLI entry point
 ├── internal/cli/        # Command implementations
 ├── pkg/
-│   ├── analyzer/        # File context and line analysis
-│   ├── patterns/        # Cryptographic pattern definitions (50+)
+│   ├── analyzer/        # File context, line analysis, and migration scoring
+│   ├── patterns/        # Cryptographic pattern definitions (100+)
 │   ├── reporter/        # Output formatters (text, json, csv, sarif, cbom)
 │   ├── scanner/         # Core scanning engine with parallel processing
-│   └── types/           # Shared type definitions
-└── crypto-samples/      # Sample files for testing
+│   └── types/           # Shared type definitions (findings, QRAMM mappings)
+└── crypto-samples/      # Sample files for testing (PQC, MACs, KDFs, hybrid)
 ```
 
 ## Roadmap
 
-### v1.0 (Current Release)
+### v1.1 (Current Release)
 - [x] Local and remote repository scanning
-- [x] 50+ cryptographic patterns
+- [x] 100+ cryptographic patterns (expanded from 50+)
 - [x] Multiple output formats (text, JSON, CSV, SARIF, CBOM)
 - [x] Context-aware analysis with confidence scoring
 - [x] Dependency scanning for 20+ package managers
 - [x] Parallel scanning with worker pools
 - [x] Inline ignore comments
+- [x] **NEW: Post-Quantum Cryptography detection (ML-KEM, ML-DSA, SLH-DSA, FN-DSA, XMSS, LMS)**
+- [x] **NEW: Hybrid cryptography recognition (X25519+ML-KEM, composite signatures)**
+- [x] **NEW: Comprehensive MAC detection (HMAC, KMAC, CMAC, GMAC, Poly1305)**
+- [x] **NEW: KDF detection (HKDF, PBKDF2, Argon2id, scrypt, bcrypt)**
+- [x] **NEW: Migration Readiness Score with visual dashboard**
+- [x] **NEW: QRAMM framework integration (CVI Dimension mapping)**
 
-### v1.1 (Next)
+### v1.2 (Next)
+- [ ] Smart remediation engine with language-specific recommendations
+- [ ] Enhanced CBOM output (CycloneDX 1.6 cryptoProperties)
 - [ ] Git history scanning (find crypto in past commits)
-- [ ] Enhanced dependency version analysis
 - [ ] Configuration file templates
 
 ### v2.0 (Future)
@@ -504,6 +575,8 @@ Learn more at [qramm.org](https://qramm.org) and [csnp.org](https://csnp.org).
 - [FIPS 203 - ML-KEM (Module-Lattice-Based Key-Encapsulation Mechanism)](https://csrc.nist.gov/pubs/fips/203/final) — Replaces RSA/ECDH for key exchange
 - [FIPS 204 - ML-DSA (Module-Lattice-Based Digital Signature Algorithm)](https://csrc.nist.gov/pubs/fips/204/final) — Replaces RSA/ECDSA for signatures
 - [FIPS 205 - SLH-DSA (Stateless Hash-Based Digital Signature Algorithm)](https://csrc.nist.gov/pubs/fips/205/final) — Alternative signature scheme
+- [FIPS 206 - FN-DSA (FFT-Based Network Digital Signature Algorithm)](https://csrc.nist.gov/pubs/fips/206/ipd) — Draft standard (formerly Falcon)
+- [SP 800-208 - XMSS and LMS Hash-Based Signatures](https://csrc.nist.gov/pubs/sp/800/208/final) — Stateful hash-based signatures
 - [NIST SP 800-131A Rev 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final) — Transitioning cryptographic algorithms and key lengths
 
 ### Additional Resources
