@@ -1,5 +1,5 @@
 # CryptoScan Makefile
-# Copyright 2025 Cyber Security Non-Profit (CSNP)
+# Copyright 2025 CyberSecurity NonProfit (CSNP)
 
 BINARY_NAME=cryptoscan
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")

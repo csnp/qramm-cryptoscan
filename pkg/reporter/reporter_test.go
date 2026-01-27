@@ -1,4 +1,4 @@
-// Copyright 2025 Cyber Security Non-Profit (CSNP)
+// Copyright 2025 CyberSecurity NonProfit (CSNP)
 // SPDX-License-Identifier: Apache-2.0
 
 package reporter
@@ -355,14 +355,14 @@ func TestCBOMAlgorithmToPrimitive(t *testing.T) {
 		{"ECDSA", "signature"},
 		{"DSA", "signature"},
 		{"Ed25519", "signature"},
-		{"DH", "kdf"},
-		{"ECDH", "kdf"},
-		{"X25519", "kdf"},
+		{"DH", "key-agreement"},
+		{"ECDH", "key-agreement"},
+		{"X25519", "key-agreement"},
 		{"AES", "block-cipher"},
 		{"DES", "block-cipher"},
 		{"3DES", "block-cipher"},
 		{"Blowfish", "block-cipher"},
-		{"ChaCha20", "block-cipher"},
+		{"ChaCha20", "stream-cipher"},
 		{"RC4", "block-cipher"},
 		{"MD5", "hash"},
 		{"SHA-1", "hash"},
@@ -370,6 +370,19 @@ func TestCBOMAlgorithmToPrimitive(t *testing.T) {
 		{"SHA-384", "hash"},
 		{"SHA-512", "hash"},
 		{"SHA-3", "hash"},
+		// PQC algorithms
+		{"ML-KEM-768", "kem"},
+		{"Kyber768", "kem"},
+		{"ML-DSA-65", "signature"},
+		{"Dilithium3", "signature"},
+		{"SLH-DSA-128f", "signature"},
+		{"SPHINCS+", "signature"},
+		// MACs and KDFs
+		{"HMAC-SHA256", "mac"},
+		{"KMAC256", "mac"},
+		{"HKDF", "kdf"},
+		{"PBKDF2", "kdf"},
+		{"Argon2id", "kdf"},
 		{"Unknown", "other"},
 		{"", "other"},
 	}

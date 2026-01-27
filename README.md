@@ -546,7 +546,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions.
 
 ## About CSNP
 
-CryptoScan is developed by the **Cyber Security Non-Profit (CSNP)**, a 501(c)(3) organization dedicated to making cybersecurity knowledge accessible to everyone through education, community, and practical resources.
+CryptoScan is developed by the **CyberSecurity NonProfit (CSNP)**, a 501(c)(3) organization dedicated to making cybersecurity knowledge accessible to everyone through education, community, and practical resources.
 
 ### Our Mission
 
@@ -589,7 +589,7 @@ Learn more at [qramm.org](https://qramm.org) and [csnp.org](https://csnp.org).
 
 Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
-Copyright 2025 Cyber Security Non-Profit (CSNP)
+Copyright 2025 CyberSecurity NonProfit (CSNP)
 
 ---
 

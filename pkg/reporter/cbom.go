@@ -1,22 +1,30 @@
-// Copyright 2025 Cyber Security Non-Profit (CSNP)
+// Copyright 2025 CyberSecurity NonProfit (CSNP)
 // SPDX-License-Identifier: Apache-2.0
 
 package reporter
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/csnp/qramm-cryptoscan/pkg/analyzer"
 	"github.com/csnp/qramm-cryptoscan/pkg/scanner"
+	"github.com/csnp/qramm-cryptoscan/pkg/types"
 )
 
 // CBOMReporter generates Cryptographic Bill of Materials output
-// Based on CycloneDX CBOM specification
-type CBOMReporter struct{}
+// Based on CycloneDX CBOM 1.6 specification
+type CBOMReporter struct {
+	remediationEngine *analyzer.RemediationEngine
+}
 
 // NewCBOMReporter creates a new CBOM reporter
 func NewCBOMReporter() *CBOMReporter {
-	return &CBOMReporter{}
+	return &CBOMReporter{
+		remediationEngine: analyzer.NewRemediationEngine(),
+	}
 }
 
 // CBOM structures following CycloneDX CBOM format
@@ -62,13 +70,16 @@ type cbomCryptoProperties struct {
 }
 
 type cbomAlgorithm struct {
-	Primitive            string   `json:"primitive,omitempty"`
-	ParameterSetIdentifier string `json:"parameterSetIdentifier,omitempty"`
-	Mode                 string   `json:"mode,omitempty"`
-	Padding              string   `json:"padding,omitempty"`
-	CryptoFunctions      []string `json:"cryptoFunctions,omitempty"`
-	ClassicalSecurityLevel int    `json:"classicalSecurityLevel,omitempty"`
-	NISTQuantumSecurityLevel int  `json:"nistQuantumSecurityLevel,omitempty"`
+	Primitive                string   `json:"primitive,omitempty"`
+	ParameterSetIdentifier   string   `json:"parameterSetIdentifier,omitempty"`
+	ExecutionEnvironment     string   `json:"executionEnvironment,omitempty"`
+	ImplementationPlatform   string   `json:"implementationPlatform,omitempty"`
+	CertificationLevel       []string `json:"certificationLevel,omitempty"`
+	Mode                     string   `json:"mode,omitempty"`
+	Padding                  string   `json:"padding,omitempty"`
+	CryptoFunctions          []string `json:"cryptoFunctions,omitempty"`
+	ClassicalSecurityLevel   int      `json:"classicalSecurityLevel,omitempty"`
+	NISTQuantumSecurityLevel int      `json:"nistQuantumSecurityLevel,omitempty"`
 }
 
 type cbomCertificate struct {
@@ -132,20 +143,114 @@ func categoryToAssetType(category string) string {
 }
 
 func algorithmToPrimitive(algo string) string {
-	switch algo {
-	case "RSA":
-		return "pke"
-	case "ECDSA", "DSA", "Ed25519":
-		return "signature"
-	case "DH", "ECDH", "X25519":
+	algoUpper := strings.ToUpper(algo)
+	switch {
+	// MACs - check before hashes because HMAC-SHA256 contains SHA
+	case strings.Contains(algoUpper, "HMAC"), strings.Contains(algoUpper, "KMAC"),
+		strings.Contains(algoUpper, "CMAC"), strings.Contains(algoUpper, "GMAC"),
+		strings.Contains(algoUpper, "POLY1305"):
+		return "mac"
+	// KDFs - check before hashes because some KDFs use hash names
+	case strings.Contains(algoUpper, "HKDF"), strings.Contains(algoUpper, "PBKDF"),
+		strings.Contains(algoUpper, "ARGON"), strings.Contains(algoUpper, "SCRYPT"),
+		strings.Contains(algoUpper, "BCRYPT"):
 		return "kdf"
-	case "AES", "DES", "3DES", "Blowfish", "ChaCha20", "RC4":
+	// Post-Quantum KEMs
+	case strings.Contains(algoUpper, "ML-KEM"), strings.Contains(algoUpper, "MLKEM"),
+		strings.Contains(algoUpper, "KYBER"):
+		return "kem"
+	// Post-Quantum Signatures
+	case strings.Contains(algoUpper, "ML-DSA"), strings.Contains(algoUpper, "MLDSA"),
+		strings.Contains(algoUpper, "DILITHIUM"),
+		strings.Contains(algoUpper, "SLH-DSA"), strings.Contains(algoUpper, "SLHDSA"),
+		strings.Contains(algoUpper, "SPHINCS"),
+		strings.Contains(algoUpper, "FN-DSA"), strings.Contains(algoUpper, "FNDSA"),
+		strings.Contains(algoUpper, "FALCON"),
+		strings.Contains(algoUpper, "XMSS"), strings.Contains(algoUpper, "LMS"):
+		return "signature"
+	// Hybrid
+	case strings.Contains(algoUpper, "HYBRID"), strings.Contains(algoUpper, "COMPOSITE"):
+		return "hybrid"
+	// Classical asymmetric
+	case algo == "RSA":
+		return "pke"
+	case algo == "ECDSA", algo == "DSA", algo == "Ed25519":
+		return "signature"
+	case algo == "DH", algo == "ECDH", algo == "X25519":
+		return "key-agreement"
+	// Symmetric
+	case algo == "AES", algo == "DES", algo == "3DES", algo == "Blowfish", algo == "RC4":
 		return "block-cipher"
-	case "MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512", "SHA-3":
+	case strings.Contains(algoUpper, "CHACHA"):
+		return "stream-cipher"
+	// Hashes
+	case strings.Contains(algoUpper, "MD5"), strings.Contains(algoUpper, "SHA"),
+		strings.Contains(algoUpper, "SHAKE"), strings.Contains(algoUpper, "BLAKE"):
 		return "hash"
 	default:
 		return "other"
 	}
+}
+
+// getAlgorithmOID returns the OID for known algorithms
+func getAlgorithmOID(algo string) string {
+	if oid, ok := types.AlgorithmOIDs[algo]; ok {
+		return oid
+	}
+	// Try uppercase
+	if oid, ok := types.AlgorithmOIDs[strings.ToUpper(algo)]; ok {
+		return oid
+	}
+	return ""
+}
+
+// getNISTQuantumLevel returns the NIST quantum security level (1-5) for an algorithm
+func getNISTQuantumLevel(algo string, quantum types.QuantumRisk) int {
+	algoUpper := strings.ToUpper(algo)
+
+	// PQC algorithms have explicit NIST levels
+	switch {
+	case strings.Contains(algoUpper, "512"):
+		if strings.Contains(algoUpper, "ML-KEM") || strings.Contains(algoUpper, "KYBER") {
+			return 1
+		}
+		if strings.Contains(algoUpper, "FALCON") || strings.Contains(algoUpper, "FN-DSA") {
+			return 1
+		}
+	case strings.Contains(algoUpper, "768"):
+		return 3 // ML-KEM-768
+	case strings.Contains(algoUpper, "1024"):
+		if strings.Contains(algoUpper, "ML-KEM") || strings.Contains(algoUpper, "KYBER") {
+			return 5
+		}
+		if strings.Contains(algoUpper, "FALCON") || strings.Contains(algoUpper, "FN-DSA") {
+			return 5
+		}
+	case strings.Contains(algoUpper, "ML-DSA-44"), strings.Contains(algoUpper, "DILITHIUM2"):
+		return 2
+	case strings.Contains(algoUpper, "ML-DSA-65"), strings.Contains(algoUpper, "DILITHIUM3"):
+		return 3
+	case strings.Contains(algoUpper, "ML-DSA-87"), strings.Contains(algoUpper, "DILITHIUM5"):
+		return 5
+	case strings.Contains(algoUpper, "SLH-DSA-128"), strings.Contains(algoUpper, "SPHINCS+-128"):
+		return 1
+	case strings.Contains(algoUpper, "SLH-DSA-192"), strings.Contains(algoUpper, "SPHINCS+-192"):
+		return 3
+	case strings.Contains(algoUpper, "SLH-DSA-256"), strings.Contains(algoUpper, "SPHINCS+-256"):
+		return 5
+	case strings.Contains(algoUpper, "XMSS"), strings.Contains(algoUpper, "LMS"):
+		return 1 // Stateful HBS are generally Level 1
+	case strings.Contains(algoUpper, "KMAC"), strings.Contains(algoUpper, "SHA3"),
+		strings.Contains(algoUpper, "SHAKE"):
+		return 1 // Quantum-safe symmetric primitives
+	}
+
+	// For safe algorithms without explicit level
+	if quantum == types.QuantumSafe {
+		return 1
+	}
+
+	return 0 // Not quantum-safe
 }
 
 func keySizeToSecurityLevel(keySize int, algo string) int {
@@ -169,19 +274,24 @@ func keySizeToSecurityLevel(keySize int, algo string) int {
 // Generate creates the CBOM report
 func (r *CBOMReporter) Generate(results *scanner.Results) (string, error) {
 	components := make([]cbomComponent, 0, len(results.Findings))
-	componentMap := make(map[string]bool)
+	componentMap := make(map[string]*cbomComponent)
+	dependencies := make([]cbomDependency, 0)
+	hybridComponents := make(map[string][]string) // Track hybrid -> component dependencies
 
-	for i, f := range results.Findings {
+	for _, f := range results.Findings {
 		// Create unique component key
 		compKey := f.Algorithm
 		if compKey == "" {
 			compKey = f.Type
 		}
 
+		// Generate a stable BOM reference
+		bomRef := fmt.Sprintf("crypto-%s-%d", sanitizeBOMRef(compKey), len(componentMap))
+
 		// Build component
 		comp := cbomComponent{
 			Type:        "cryptographic-asset",
-			BOMRef:      f.ID,
+			BOMRef:      bomRef,
 			Name:        compKey,
 			Description: f.Description,
 			CryptoProperties: &cbomCryptoProperties{
@@ -198,16 +308,46 @@ func (r *CBOMReporter) Generate(results *scanner.Results) (string, error) {
 			},
 		}
 
+		// Add OID if available
+		if oid := getAlgorithmOID(f.Algorithm); oid != "" {
+			comp.CryptoProperties.OID = oid
+		}
+
 		// Add algorithm properties
 		if f.Algorithm != "" {
+			primitive := algorithmToPrimitive(f.Algorithm)
 			comp.CryptoProperties.AlgorithmProperties = &cbomAlgorithm{
-				Primitive: algorithmToPrimitive(f.Algorithm),
+				Primitive: primitive,
 			}
+
+			// Set parameter set identifier for PQC algorithms
+			if paramSet := extractParameterSet(f.Algorithm); paramSet != "" {
+				comp.CryptoProperties.AlgorithmProperties.ParameterSetIdentifier = paramSet
+			}
+
+			// Set classical security level
 			if f.KeySize > 0 {
 				comp.CryptoProperties.AlgorithmProperties.ClassicalSecurityLevel = keySizeToSecurityLevel(f.KeySize, f.Algorithm)
+			} else {
+				// Estimate from algorithm
+				comp.CryptoProperties.AlgorithmProperties.ClassicalSecurityLevel = estimateClassicalSecurity(f.Algorithm)
 			}
-			if f.Quantum == scanner.QuantumSafe {
-				comp.CryptoProperties.AlgorithmProperties.NISTQuantumSecurityLevel = 1
+
+			// Set NIST quantum security level
+			nistLevel := getNISTQuantumLevel(f.Algorithm, f.Quantum)
+			if nistLevel > 0 {
+				comp.CryptoProperties.AlgorithmProperties.NISTQuantumSecurityLevel = nistLevel
+			}
+
+			// Track hybrid dependencies
+			if primitive == "hybrid" {
+				classicalAlgo, pqcAlgo := extractHybridComponents(f.Algorithm)
+				if classicalAlgo != "" {
+					hybridComponents[bomRef] = append(hybridComponents[bomRef], classicalAlgo)
+				}
+				if pqcAlgo != "" {
+					hybridComponents[bomRef] = append(hybridComponents[bomRef], pqcAlgo)
+				}
 			}
 		}
 
@@ -216,29 +356,57 @@ func (r *CBOMReporter) Generate(results *scanner.Results) (string, error) {
 			comp.CryptoProperties.ProtocolProperties = &cbomProtocol{
 				Type: "tls",
 			}
+			// Extract TLS version if present
+			if version := extractTLSVersion(f.Match); version != "" {
+				comp.CryptoProperties.ProtocolProperties.Version = version
+			}
 		}
 
 		// Deduplicate components by merging occurrences
-		if !componentMap[compKey] {
-			componentMap[compKey] = true
-			components = append(components, comp)
+		if existing, ok := componentMap[compKey]; ok {
+			existing.Evidence.Occurrences = append(
+				existing.Evidence.Occurrences,
+				cbomOccurrence{
+					Location: f.File,
+					Line:     f.Line,
+					Symbol:   f.Match,
+				},
+			)
 		} else {
-			// Find existing component and add occurrence
-			for j := range components {
-				if components[j].Name == compKey {
-					components[j].Evidence.Occurrences = append(
-						components[j].Evidence.Occurrences,
-						cbomOccurrence{
-							Location: f.File,
-							Line:     f.Line,
-							Symbol:   f.Match,
-						},
-					)
+			componentMap[compKey] = &comp
+			components = append(components, comp)
+		}
+	}
+
+	// Build dependencies for hybrid components
+	for hybridRef, depAlgos := range hybridComponents {
+		dep := cbomDependency{
+			Ref:       hybridRef,
+			DependsOn: make([]string, 0),
+		}
+		for _, algoName := range depAlgos {
+			// Find the component ref for this algorithm
+			for _, c := range components {
+				if c.Name == algoName {
+					dep.DependsOn = append(dep.DependsOn, c.BOMRef)
 					break
 				}
 			}
 		}
-		_ = i // suppress unused warning
+		if len(dep.DependsOn) > 0 {
+			dependencies = append(dependencies, dep)
+		}
+	}
+
+	// Add migration score summary if available
+	var summaryComponent *cbomComponent
+	if results.MigrationScore != nil {
+		summaryComponent = &cbomComponent{
+			Type:        "cryptographic-asset",
+			BOMRef:      "crypto-inventory-summary",
+			Name:        "Cryptographic Inventory Summary",
+			Description: fmt.Sprintf("Migration Readiness: %.1f%% (%s)", results.MigrationScore.Score, results.MigrationScore.Level),
+		}
 	}
 
 	report := cbomReport{
@@ -252,11 +420,13 @@ func (r *CBOMReporter) Generate(results *scanner.Results) (string, error) {
 				{
 					Vendor:  "CSNP",
 					Name:    "CryptoScan",
-					Version: "1.0.0",
+					Version: "1.1.0",
 				},
 			},
+			Component: summaryComponent,
 		},
-		Components: components,
+		Components:   components,
+		Dependencies: dependencies,
 	}
 
 	data, err := json.MarshalIndent(report, "", "  ")
@@ -265,6 +435,101 @@ func (r *CBOMReporter) Generate(results *scanner.Results) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+// sanitizeBOMRef creates a valid BOM reference from a string
+func sanitizeBOMRef(s string) string {
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, " ", "-")
+	s = strings.ReplaceAll(s, "_", "-")
+	s = strings.ReplaceAll(s, "+", "-")
+	return s
+}
+
+// extractParameterSet extracts the parameter set from an algorithm name
+func extractParameterSet(algo string) string {
+	algoUpper := strings.ToUpper(algo)
+	switch {
+	case strings.Contains(algoUpper, "ML-KEM-512"), strings.Contains(algoUpper, "KYBER512"):
+		return "ML-KEM-512"
+	case strings.Contains(algoUpper, "ML-KEM-768"), strings.Contains(algoUpper, "KYBER768"):
+		return "ML-KEM-768"
+	case strings.Contains(algoUpper, "ML-KEM-1024"), strings.Contains(algoUpper, "KYBER1024"):
+		return "ML-KEM-1024"
+	case strings.Contains(algoUpper, "ML-DSA-44"), strings.Contains(algoUpper, "DILITHIUM2"):
+		return "ML-DSA-44"
+	case strings.Contains(algoUpper, "ML-DSA-65"), strings.Contains(algoUpper, "DILITHIUM3"):
+		return "ML-DSA-65"
+	case strings.Contains(algoUpper, "ML-DSA-87"), strings.Contains(algoUpper, "DILITHIUM5"):
+		return "ML-DSA-87"
+	case strings.Contains(algoUpper, "SLH-DSA-128"):
+		return "SLH-DSA-128"
+	case strings.Contains(algoUpper, "SLH-DSA-192"):
+		return "SLH-DSA-192"
+	case strings.Contains(algoUpper, "SLH-DSA-256"):
+		return "SLH-DSA-256"
+	}
+	return ""
+}
+
+// estimateClassicalSecurity estimates classical security bits for algorithms
+func estimateClassicalSecurity(algo string) int {
+	algoUpper := strings.ToUpper(algo)
+	switch {
+	case strings.Contains(algoUpper, "256"):
+		return 256
+	case strings.Contains(algoUpper, "384"):
+		return 384
+	case strings.Contains(algoUpper, "512"):
+		return 512
+	case strings.Contains(algoUpper, "128"):
+		return 128
+	case strings.Contains(algoUpper, "192"):
+		return 192
+	case strings.Contains(algoUpper, "ML-KEM-768"), strings.Contains(algoUpper, "KYBER768"):
+		return 192
+	case strings.Contains(algoUpper, "ML-DSA-65"), strings.Contains(algoUpper, "DILITHIUM3"):
+		return 192
+	case strings.Contains(algoUpper, "AES"):
+		return 256 // Assume AES-256
+	case strings.Contains(algoUpper, "CHACHA"):
+		return 256
+	}
+	return 0
+}
+
+// extractHybridComponents extracts the classical and PQC algorithm names from a hybrid
+func extractHybridComponents(algo string) (classical string, pqc string) {
+	algoUpper := strings.ToUpper(algo)
+	switch {
+	case strings.Contains(algoUpper, "X25519") && strings.Contains(algoUpper, "MLKEM"):
+		return "X25519", "ML-KEM-768"
+	case strings.Contains(algoUpper, "X25519") && strings.Contains(algoUpper, "KYBER"):
+		return "X25519", "ML-KEM-768"
+	case strings.Contains(algoUpper, "ECDSA") && strings.Contains(algoUpper, "MLDSA"):
+		return "ECDSA", "ML-DSA-65"
+	case strings.Contains(algoUpper, "ECDSA") && strings.Contains(algoUpper, "DILITHIUM"):
+		return "ECDSA", "ML-DSA-65"
+	case strings.Contains(algoUpper, "RSA") && strings.Contains(algoUpper, "MLDSA"):
+		return "RSA", "ML-DSA-65"
+	}
+	return "", ""
+}
+
+// extractTLSVersion extracts the TLS version from a match string
+func extractTLSVersion(match string) string {
+	matchUpper := strings.ToUpper(match)
+	switch {
+	case strings.Contains(matchUpper, "1.3") || strings.Contains(matchUpper, "TLS13"):
+		return "1.3"
+	case strings.Contains(matchUpper, "1.2") || strings.Contains(matchUpper, "TLS12"):
+		return "1.2"
+	case strings.Contains(matchUpper, "1.1") || strings.Contains(matchUpper, "TLS11"):
+		return "1.1"
+	case strings.Contains(matchUpper, "1.0") || strings.Contains(matchUpper, "TLS10"):
+		return "1.0"
+	}
+	return ""
 }
 
 // Simple UUID generator for CBOM serial numbers

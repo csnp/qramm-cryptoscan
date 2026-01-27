@@ -1,4 +1,4 @@
-// Copyright 2025 Cyber Security Non-Profit (CSNP)
+// Copyright 2025 CyberSecurity NonProfit (CSNP)
 // SPDX-License-Identifier: Apache-2.0
 
 // Package analyzer provides intelligent file analysis capabilities
