@@ -67,8 +67,12 @@ var versionCmd = &cobra.Command{
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("cryptoscan %s\n", version)
-		fmt.Printf("  commit: %s\n", commit)
-		fmt.Printf("  built:  %s\n", buildDate)
+		if commit != "none" {
+			fmt.Printf("  commit: %s\n", commit)
+		}
+		if buildDate != "unknown" {
+			fmt.Printf("  built:  %s\n", buildDate)
+		}
 		fmt.Printf("\nPart of QRAMM - https://qramm.org\n")
 		fmt.Printf("Copyright 2025 CSNP - https://csnp.org\n")
 	},
