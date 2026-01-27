@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/csnp/qramm-cryptoscan/actions/workflows/ci.yml"><img src="https://github.com/csnp/qramm-cryptoscan/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://goreportcard.com/report/github.com/csnp/qramm-cryptoscan"><img src="https://goreportcard.com/badge/github.com/csnp/qramm-cryptoscan?v=2" alt="Go Report Card"></a>
+  <a href="https://github.com/csnp/cryptoscan/actions/workflows/ci.yml"><img src="https://github.com/csnp/cryptoscan/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://goreportcard.com/report/github.com/csnp/cryptoscan"><img src="https://goreportcard.com/badge/github.com/csnp/cryptoscan?v=2" alt="Go Report Card"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white" alt="Go Version"></a>
 </p>
@@ -97,7 +97,7 @@ Requires **Go 1.21+** ([install Go](https://go.dev/dl/))
 Copy and paste this entire block:
 
 ```bash
-git clone https://github.com/csnp/qramm-cryptoscan.git
+git clone https://github.com/csnp/cryptoscan.git
 cd qramm-cryptoscan
 go build -o cryptoscan ./cmd/cryptoscan
 sudo mv cryptoscan /usr/local/bin/
@@ -110,12 +110,12 @@ cryptoscan version
 For Go developers:
 
 ```bash
-go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@latest
+go install github.com/csnp/cryptoscan/cmd/cryptoscan@latest
 ```
 
 #### Option 3: Download Binary
 
-Download pre-built binaries from [GitHub Releases](https://github.com/csnp/qramm-cryptoscan/releases/latest).
+Download pre-built binaries from [GitHub Releases](https://github.com/csnp/cryptoscan/releases/latest).
 
 ### Basic Usage
 
@@ -139,7 +139,7 @@ This repository includes sample cryptographic code for testing:
 
 ```bash
 # Clone and build
-git clone https://github.com/csnp/qramm-cryptoscan.git
+git clone https://github.com/csnp/cryptoscan.git
 cd qramm-cryptoscan
 go build -o cryptoscan ./cmd/cryptoscan
 
@@ -356,7 +356,7 @@ jobs:
           go-version: '1.21'
 
       - name: Install CryptoScan
-        run: go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@latest
+        run: go install github.com/csnp/cryptoscan/cmd/cryptoscan@latest
 
       - name: Run Scan
         run: cryptoscan scan . --format sarif --output results.sarif
@@ -374,7 +374,7 @@ crypto-scan:
   stage: security
   image: golang:1.21
   script:
-    - go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@latest
+    - go install github.com/csnp/cryptoscan/cmd/cryptoscan@latest
     - cryptoscan scan . --format json --output crypto-findings.json
   artifacts:
     reports:
@@ -412,7 +412,7 @@ SARIF output integrates with GitHub Code Scanning, VS Code SARIF Viewer, and oth
     "tool": {
       "driver": {
         "name": "CryptoScan",
-        "informationUri": "https://github.com/csnp/qramm-cryptoscan"
+        "informationUri": "https://github.com/csnp/cryptoscan"
       }
     },
     "results": [...]
@@ -515,7 +515,7 @@ We welcome contributions from the community! See [CONTRIBUTING.md](CONTRIBUTING.
 
 ```bash
 # Clone the repository
-git clone https://github.com/csnp/qramm-cryptoscan.git
+git clone https://github.com/csnp/cryptoscan.git
 cd qramm-cryptoscan
 
 # Install dependencies
@@ -600,6 +600,6 @@ Copyright 2025 CyberSecurity NonProfit (CSNP)
 <p align="center">
   <a href="https://qramm.org">QRAMM</a> •
   <a href="https://csnp.org">CSNP</a> •
-  <a href="https://github.com/csnp/qramm-cryptoscan/issues">Issues</a> •
+  <a href="https://github.com/csnp/cryptoscan/issues">Issues</a> •
   <a href="https://twitter.com/csnp_org">Twitter</a>
 </p>
