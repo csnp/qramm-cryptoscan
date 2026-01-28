@@ -76,7 +76,7 @@ changelog:
 release:
   github:
     owner: csnp
-    name: qramm-cryptoscan
+    name: cryptoscan
   draft: false
   prerelease: auto
   mode: replace
@@ -93,7 +93,7 @@ release:
 
     ```bash
     # Using Go
-    go install github.com/csnp/qramm-cryptoscan/cmd/cryptoscan@{{ .Tag }}
+    go install github.com/csnp/cryptoscan/cmd/cryptoscan@{{ .Tag }}
 
     # Or download binary from assets below
     ```
